@@ -146,6 +146,10 @@ public class AmmoType extends EquipmentType {
     public static final int T_BARRACUDA_T = 112;
     public static final int T_INFANTRY = 113;
 
+    /**
+     * @author Rumia
+     * @since Feb 25, 2024
+     */
     // Piratetech Ammo
     public static final int T_BALLISTA = 114;
     public static final int T_BALLISTA_HEAVY = 115;
@@ -1399,6 +1403,10 @@ public class AmmoType extends EquipmentType {
         base = AmmoType.createCLAPMortar8Ammo();
         clanMortarAmmos.add(base);
 
+        /**
+        * @author Rumia
+        * @since Feb 25, 2024
+        */
         // Piratetech Ammo
           // Ballistic
             // Autocannon
@@ -1412,6 +1420,7 @@ public class AmmoType extends EquipmentType {
         EquipmentType.addType(AmmoType.createPBallistaAmmo());
         EquipmentType.addType(AmmoType.createPLTBallistaAmmo());
         EquipmentType.addType(AmmoType.createPHVBallistaAmmo());
+
 
         // Create the munition types for IS Mek mortars
         munitions.add(new MunitionMutator("Airburst", 1, Munitions.M_AIRBURST,
@@ -14432,6 +14441,11 @@ public class AmmoType extends EquipmentType {
         return (ammoOfSameType || mmlAmmoMatch || lbxAmmoMatch || ar10Match) && !caselessMismatch
                 && !staticFeedMismatch;
     }
+
+    /**
+    * @author Rumia
+    * @since Feb 25, 2024
+    */
 
     // Piratetech Ammo
     private static AmmoType createPTISRotary10Ammo() {
