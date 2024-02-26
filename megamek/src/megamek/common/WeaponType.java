@@ -68,6 +68,10 @@ import megamek.common.weapons.tag.CLTAG;
 import megamek.common.weapons.tag.ISTAG;
 import megamek.common.weapons.unofficial.*;
 
+// Piratetech
+import megamek.common.weapons.piratetech.autocannons.*;
+//import megamek.common.weapons.piratetech.lasers.*;
+
 // TODO add XML support back in.
 
 /**
@@ -1362,8 +1366,8 @@ public class WeaponType extends EquipmentType {
         EquipmentType.addType(new CLPlasmaRifle());
         EquipmentType.addType(new CLRAC2());
         EquipmentType.addType(new CLRAC5());
-        EquipmentType.addType(new CLRAC10());
-        EquipmentType.addType(new CLRAC20());
+        //EquipmentType.addType(new CLRAC10());
+        //EquipmentType.addType(new CLRAC20());
 
         // misc lvl3 stuff
         EquipmentType.addType(new ISRailGun());
@@ -2178,6 +2182,14 @@ public class WeaponType extends EquipmentType {
         EquipmentType.addType(new ISAPDS());
         EquipmentType.addType(new ISBAAPDS());
         EquipmentType.addType(new ISRISCHyperLaser());
+
+        EquipmentType.addType(new ISBAAPDS());
+        EquipmentType.addType(new ISRISCHyperLaser());
+
+        // Piratetech Weapons
+        EquipmentType.addType(new PTISRAC10());
+        EquipmentType.addType(new PTISRAC20());
+        EquipmentType.addType(new ISHVAC20());
     }
 
     public int getExplosionDamage() {

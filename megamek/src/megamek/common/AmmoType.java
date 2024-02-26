@@ -864,8 +864,8 @@ public class AmmoType extends EquipmentType {
         EquipmentType.addType(AmmoType.createISTHBUltra20Ammo());
         EquipmentType.addType(AmmoType.createISRotary2Ammo());
         EquipmentType.addType(AmmoType.createISRotary5Ammo());
-        EquipmentType.addType(AmmoType.createISRotary10Ammo());
-        EquipmentType.addType(AmmoType.createISRotary20Ammo());
+        //EquipmentType.addType(AmmoType.createISRotary10Ammo());
+        //EquipmentType.addType(AmmoType.createISRotary20Ammo());
         EquipmentType.addType(AmmoType.createISGaussAmmo());
         EquipmentType.addType(AmmoType.createISLTGaussAmmo());
         EquipmentType.addType(AmmoType.createISHVGaussAmmo());
@@ -1391,6 +1391,11 @@ public class AmmoType extends EquipmentType {
         clanMortarAmmos.add(base);
         base = AmmoType.createCLAPMortar8Ammo();
         clanMortarAmmos.add(base);
+
+        // Piratetech Ammo
+        EquipmentType.addType(AmmoType.createPTISRotary10Ammo());
+        EquipmentType.addType(AmmoType.createPTISRotary20Ammo());
+        EquipmentType.addType(AmmoType.createISHVAC20Ammo());
 
         // Create the munition types for IS Mek mortars
         munitions.add(new MunitionMutator("Airburst", 1, Munitions.M_AIRBURST,
@@ -13244,6 +13249,7 @@ public class AmmoType extends EquipmentType {
         return ammo;
     }
 
+    /*
     private static AmmoType createISRotary10Ammo() {
         AmmoType ammo = new AmmoType();
 
@@ -13285,6 +13291,7 @@ public class AmmoType extends EquipmentType {
         ammo.techAdvancement.setAvailability(RATING_E, RATING_E, RATING_E, RATING_E);
         return ammo;
     }
+    */
 
     private static AmmoType createCLRotary10Ammo() {
         AmmoType ammo = new AmmoType();
@@ -14409,4 +14416,72 @@ public class AmmoType extends EquipmentType {
         return (ammoOfSameType || mmlAmmoMatch || lbxAmmoMatch || ar10Match) && !caselessMismatch
                 && !staticFeedMismatch;
     }
-}
+
+    // Piratetech Ammo
+    private static AmmoType createPTISRotary10Ammo() {
+      AmmoType ammo = new AmmoType();
+
+      ammo.name = "Rotary AC/10 Ammo";
+      ammo.shortName = "RAC/10";
+      ammo.setInternalName("ISRotaryAC10 Ammo");
+      ammo.addLookupName("IS Rotary AC/10 Ammo");
+      ammo.addLookupName("ISRAC10 Ammo");
+      ammo.damagePerShot = 1;
+      ammo.rackSize = 10;
+      ammo.ammoType = AmmoType.T_AC_ROTARY;
+      ammo.shots = 10;
+      ammo.bv = 67;
+      ammo.cost = 12000;
+      ammo.rulesRefs = "207, TM";
+      ammo.techAdvancement.setTechBase(TECH_BASE_IS).setIntroLevel(false).setUnofficial(false)
+          .setTechRating(RATING_E)
+          .setAvailability(RATING_X, RATING_X, RATING_E, RATING_D)
+          .setISAdvancement(3060, 3062, 3071, DATE_NONE, DATE_NONE)
+          .setISApproximate(true, false, false, false, false).setPrototypeFactions(F_FS)
+          .setProductionFactions(F_FS);
+      return ammo;
+    }
+
+    private static AmmoType createPTISRotary20Ammo() {
+      AmmoType ammo = new AmmoType();
+
+      ammo.name = "Rotary AC/20 Ammo";
+      ammo.shortName = "RAC/20";
+      ammo.setInternalName("ISRotaryAC20 Ammo");
+      ammo.addLookupName("IS Rotary AC/20 Ammo");
+      ammo.addLookupName("ISRAC20 Ammo");
+      ammo.damagePerShot = 1;
+      ammo.rackSize = 20;
+      ammo.ammoType = AmmoType.T_AC_ROTARY;
+      ammo.shots = 5;
+      ammo.bv = 95;
+      ammo.cost = 20000;
+      ammo.rulesRefs = "207, TM";
+      ammo.techAdvancement.setTechBase(TECH_BASE_IS).setIntroLevel(false).setUnofficial(false).setTechRating(RATING_E).setAvailability(RATING_X, RATING_X, RATING_E, RATING_D).setISAdvancement(3060, 3062, 3071, DATE_NONE, DATE_NONE).setISApproximate(true, false, false, false, false).setPrototypeFactions(F_FS).setProductionFactions(F_FS);
+      return ammo;
+    }
+
+    private static AmmoType createISHVAC20Ammo() {
+      AmmoType ammo = new AmmoType();
+
+      ammo.name = "HVAC/20 Ammo";
+      ammo.shortName = "HVAC/20";
+      ammo.setInternalName("IS Ammo HVAC/20");
+      ammo.addLookupName("ISHVAC20 Ammo");
+      ammo.addLookupName("IS Hyper Velocity Autocannon/20 Ammo");
+      ammo.addLookupName("Hyper Velocity AC/20 Ammo");
+      ammo.damagePerShot = 1;
+      ammo.rackSize = 20;
+      ammo.ammoType = AmmoType.T_HYPER_VELOCITY;
+      ammo.shots = 4;
+      ammo.bv = 30;
+      ammo.cost = 35000;
+      ammo.rulesRefs = "285, TO";
+      // Tech Progression tweaked to combine IntOps with TRO Prototypes/3145 NTNU RS
+      ammo.techAdvancement.setTechBase(TECH_BASE_IS).setTechRating(RATING_D)
+          .setAvailability(RATING_X, RATING_X, RATING_F, RATING_E).setISAdvancement(3059, 3079)
+          .setISApproximate(false, false).setPrototypeFactions(F_CC).setProductionFactions(F_CC)
+          .setStaticTechLevel(SimpleTechLevel.ADVANCED);
+      return ammo;
+    }
+  }
