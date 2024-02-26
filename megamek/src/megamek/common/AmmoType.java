@@ -150,10 +150,11 @@ public class AmmoType extends EquipmentType {
     public static final int T_BALLISTA = 114;
     public static final int T_BALLISTA_HEAVY = 115;
     public static final int T_BALLISTA_LIGHT = 116;
+    public static final int T_AC_CANNON = 117;
 
-    public static final int NUM_TYPES = 117; // Should always be at the end with the highest number
+    public static final int NUM_TYPES = 118; // Should always be at the end with the highest number
 
-    /**
+  /**
      * Contains the {@code AmmoType}s that could share ammo (e.g. SRM 2 and SRM 6,
      * both fire SRM rounds).
      */
@@ -1404,6 +1405,8 @@ public class AmmoType extends EquipmentType {
         EquipmentType.addType(AmmoType.createPTISRotary10Ammo());
         EquipmentType.addType(AmmoType.createPTISRotary20Ammo());
         EquipmentType.addType(AmmoType.createISHVAC20Ammo());
+        EquipmentType.addType(AmmoType.createPCannonClusterAmmo());
+        EquipmentType.addType(AmmoType.createPCannonAmmo());
 
             // Gauss
         EquipmentType.addType(AmmoType.createPBallistaAmmo());
@@ -4371,29 +4374,29 @@ public class AmmoType extends EquipmentType {
     }
 
     private static AmmoType createISLB10XAmmo() {
-        AmmoType ammo = new AmmoType();
+    AmmoType ammo = new AmmoType();
 
-        ammo.name = "LB 10-X AC Ammo";
-        ammo.shortName = "LB 10-X";
-        ammo.setInternalName("IS LB 10-X AC Ammo");
-        ammo.addLookupName("IS Ammo 10-X");
-        ammo.addLookupName("ISLBXAC10 Ammo");
-        ammo.addLookupName("IS LB 10-X AC Ammo - Slug");
-        ammo.damagePerShot = 1;
-        ammo.rackSize = 10;
-        ammo.ammoType = AmmoType.T_AC_LBX;
-        ammo.shots = 10;
-        ammo.bv = 19;
-        ammo.cost = 12000;
-        ammo.rulesRefs = "207, TM";
-        ammo.techAdvancement.setTechBase(TECH_BASE_IS).setIntroLevel(false).setUnofficial(false)
-                .setTechRating(RATING_E)
-                .setAvailability(RATING_E, RATING_F, RATING_D, RATING_C)
-                .setISAdvancement(2590, 2595, 3040, 2840, 3035)
-                .setISApproximate(false, false, false, false, false).setPrototypeFactions(F_TH)
-                .setProductionFactions(F_TH).setReintroductionFactions(F_FS);
-        return ammo;
-    }
+    ammo.name = "LB 10-X AC Ammo";
+    ammo.shortName = "LB 10-X";
+    ammo.setInternalName("IS LB 10-X AC Ammo");
+    ammo.addLookupName("IS Ammo 10-X");
+    ammo.addLookupName("ISLBXAC10 Ammo");
+    ammo.addLookupName("IS LB 10-X AC Ammo - Slug");
+    ammo.damagePerShot = 1;
+    ammo.rackSize = 10;
+    ammo.ammoType = AmmoType.T_AC_LBX;
+    ammo.shots = 10;
+    ammo.bv = 19;
+    ammo.cost = 12000;
+    ammo.rulesRefs = "207, TM";
+    ammo.techAdvancement.setTechBase(TECH_BASE_IS).setIntroLevel(false).setUnofficial(false)
+        .setTechRating(RATING_E)
+        .setAvailability(RATING_E, RATING_F, RATING_D, RATING_C)
+        .setISAdvancement(2590, 2595, 3040, 2840, 3035)
+        .setISApproximate(false, false, false, false, false).setPrototypeFactions(F_TH)
+        .setProductionFactions(F_TH).setReintroductionFactions(F_FS);
+    return ammo;
+  }
 
     private static AmmoType createISLB20XAmmo() {
         AmmoType ammo = new AmmoType();
@@ -14569,6 +14572,52 @@ public class AmmoType extends EquipmentType {
           .setISAdvancement(3051, 3061, 3067, DATE_NONE, DATE_NONE)
           .setISApproximate(true, false, false, false, false).setPrototypeFactions(F_FW)
           .setProductionFactions(F_FC);
+      return ammo;
+    }
+
+    private static AmmoType createPCannonClusterAmmo() {
+      AmmoType ammo = new AmmoType();
+
+      ammo.name = "Pirate Cannon Grapeshot Ammo";
+      ammo.shortName = "Pirate Cannon Grapeshot";
+      ammo.setInternalName("Pirate Cannon Grapeshot Ammo");
+      ammo.addLookupName("Pirate Cannon Grapeshot ");
+      ammo.damagePerShot = 1;
+      ammo.toHitModifier = -1;
+      ammo.rackSize = 1;
+      ammo.ammoType = AmmoType.T_AC_CANNON;
+      ammo.munitionType = EnumSet.of(Munitions.M_CLUSTER);
+      ammo.shots = 6;
+      ammo.bv = 16;
+      ammo.cost = 5000;
+      ammo.rulesRefs = "207, TM";
+      ammo.techAdvancement.setTechBase(TECH_BASE_IS).setIntroLevel(false).setUnofficial(false)
+          .setTechRating(RATING_C)
+          .setAvailability(RATING_C)
+          .setISAdvancement(3047)
+          .setISApproximate(false, false, false, false, false);
+      return ammo;
+    }
+
+    private static AmmoType createPCannonAmmo() {
+      AmmoType ammo = new AmmoType();
+
+      ammo.name = "Pirate Cannon Standard Ammo";
+      ammo.shortName = "Pirate Cannon Standard";
+      ammo.setInternalName("Pirate Cannon Standard Ammo");
+      ammo.addLookupName("Pirate Cannon Standard ");
+      ammo.damagePerShot = 1;
+      ammo.rackSize = 1;
+      ammo.ammoType = AmmoType.T_AC_CANNON;
+      ammo.shots = 6;
+      ammo.bv = 16;
+      ammo.cost = 5000;
+      ammo.rulesRefs = "207, TM";
+      ammo.techAdvancement.setTechBase(TECH_BASE_IS).setIntroLevel(false).setUnofficial(false)
+          .setTechRating(RATING_C)
+          .setAvailability(RATING_C)
+          .setISAdvancement(3047)
+          .setISApproximate(false, false, false, false, false);
       return ammo;
     }
   }

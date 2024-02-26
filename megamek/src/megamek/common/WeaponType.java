@@ -2194,6 +2194,7 @@ public class WeaponType extends EquipmentType {
         EquipmentType.addType(new PBallista());
         EquipmentType.addType(new PHBallista());
         EquipmentType.addType(new PLBallista());
+        EquipmentType.addType(new PCannon());
     }
 
     public int getExplosionDamage() {
