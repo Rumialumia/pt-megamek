@@ -18,8 +18,8 @@ import megamek.common.SimpleTechLevel;
 import megamek.common.weapons.autocannons.HVACWeapon;
 
 /**
- * @author Jason Tighe
- * @since Sep 25, 2004
+ * @author Rumia
+ * @since Feb 25, 2024
  */
 public class ISHVAC20 extends HVACWeapon {
   private static final long serialVersionUID = 4958849713169213573L;

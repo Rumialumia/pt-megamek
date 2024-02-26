@@ -70,6 +70,7 @@ import megamek.common.weapons.unofficial.*;
 
 // Piratetech
 import megamek.common.weapons.piratetech.autocannons.*;
+import megamek.common.weapons.piratetech.gaussrifles.*;
 //import megamek.common.weapons.piratetech.lasers.*;
 
 // TODO add XML support back in.
@@ -2190,6 +2191,9 @@ public class WeaponType extends EquipmentType {
         EquipmentType.addType(new PTISRAC10());
         EquipmentType.addType(new PTISRAC20());
         EquipmentType.addType(new ISHVAC20());
+        EquipmentType.addType(new PBallista());
+        EquipmentType.addType(new PHBallista());
+        EquipmentType.addType(new PLBallista());
     }
 
     public int getExplosionDamage() {

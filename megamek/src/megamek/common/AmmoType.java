@@ -145,7 +145,13 @@ public class AmmoType extends EquipmentType {
     public static final int T_WHITE_SHARK_T = 111;
     public static final int T_BARRACUDA_T = 112;
     public static final int T_INFANTRY = 113;
-    public static final int NUM_TYPES = 114; // Should always be at the end with the highest number
+
+    // Piratetech Ammo
+    public static final int T_BALLISTA = 114;
+    public static final int T_BALLISTA_HEAVY = 115;
+    public static final int T_BALLISTA_LIGHT = 116;
+
+    public static final int NUM_TYPES = 117; // Should always be at the end with the highest number
 
     /**
      * Contains the {@code AmmoType}s that could share ammo (e.g. SRM 2 and SRM 6,
@@ -1393,9 +1399,16 @@ public class AmmoType extends EquipmentType {
         clanMortarAmmos.add(base);
 
         // Piratetech Ammo
+          // Ballistic
+            // Autocannon
         EquipmentType.addType(AmmoType.createPTISRotary10Ammo());
         EquipmentType.addType(AmmoType.createPTISRotary20Ammo());
         EquipmentType.addType(AmmoType.createISHVAC20Ammo());
+
+            // Gauss
+        EquipmentType.addType(AmmoType.createPBallistaAmmo());
+        EquipmentType.addType(AmmoType.createPLTBallistaAmmo());
+        EquipmentType.addType(AmmoType.createPHVBallistaAmmo());
 
         // Create the munition types for IS Mek mortars
         munitions.add(new MunitionMutator("Airburst", 1, Munitions.M_AIRBURST,
@@ -14482,6 +14495,80 @@ public class AmmoType extends EquipmentType {
           .setAvailability(RATING_X, RATING_X, RATING_F, RATING_E).setISAdvancement(3059, 3079)
           .setISApproximate(false, false).setPrototypeFactions(F_CC).setProductionFactions(F_CC)
           .setStaticTechLevel(SimpleTechLevel.ADVANCED);
+      return ammo;
+    }
+
+    private static AmmoType createPBallistaAmmo() {
+      AmmoType ammo = new AmmoType();
+
+      ammo.name = "Ballista Ammo";
+      ammo.shortName = "Ballista";
+      ammo.setInternalName("Pirate Ballista Ammo");
+      ammo.addLookupName("Pirate Ammo Ballista");
+      ammo.damagePerShot = 11;
+      ammo.explosive = false;
+      ammo.ammoType = AmmoType.T_GAUSS;
+      ammo.shots = 16;
+      ammo.bv = 30;
+      ammo.cost = 10000;
+      ammo.rulesRefs = "219, TM";
+
+      ammo.techAdvancement.setTechBase(TECH_BASE_IS)
+          .setTechRating(RATING_E)
+          .setAvailability(RATING_E, RATING_F)
+          .setISAdvancement(3053, 3062, DATE_NONE, DATE_NONE, DATE_NONE)
+          .setISApproximate(false, false, false, false, false)
+          .setPrototypeFactions(F_PER)
+          .setProductionFactions(F_PER);
+
+      return ammo;
+    }
+
+    private static AmmoType createPLTBallistaAmmo() {
+      AmmoType ammo = new AmmoType();
+
+      ammo.name = "Light Ballista Ammo";
+      ammo.shortName = "Light Ballista";
+      ammo.setInternalName("Pirate Light Ballista Ammo");
+      ammo.addLookupName("PirateLightBallista Ammo");
+      ammo.damagePerShot = 6;
+      ammo.explosive = false;
+      ammo.ammoType = AmmoType.T_GAUSS_LIGHT;
+      ammo.shots = 24;
+      ammo.bv = 15;
+      ammo.cost = 10000;
+      ammo.rulesRefs = "219, TM";
+      ammo.techAdvancement.setTechBase(TECH_BASE_IS).setIntroLevel(false).setUnofficial(false)
+          .setTechRating(RATING_E)
+          .setAvailability(RATING_E, RATING_E, RATING_E, RATING_D)
+          .setISAdvancement(3054, 3065, DATE_NONE, DATE_NONE, DATE_NONE)
+          .setISApproximate(true, false, false, false, false)
+          .setPrototypeFactions(F_PER)
+          .setProductionFactions(F_PER);
+      return ammo;
+    }
+
+    private static AmmoType createPHVBallistaAmmo() {
+      AmmoType ammo = new AmmoType();
+
+      ammo.name = "Heavy Ballista Ammo";
+      ammo.shortName = "Heavy Ballista";
+      ammo.setInternalName("ISHeavyGauss Ammo");
+      ammo.addLookupName("IS Heavy Gauss Rifle Ammo");
+      ammo.addLookupName("ISHeavyGaussRifle Ammo");
+      ammo.damagePerShot = 19; // actually variable
+      ammo.explosive = false;
+      ammo.ammoType = AmmoType.T_GAUSS_HEAVY;
+      ammo.shots = 8;
+      ammo.bv = 31;
+      ammo.cost = 10000;
+      ammo.rulesRefs = "218, TM";
+      ammo.techAdvancement.setTechBase(TECH_BASE_IS).setIntroLevel(false).setUnofficial(false)
+          .setTechRating(RATING_E)
+          .setAvailability(RATING_X, RATING_X, RATING_E, RATING_D)
+          .setISAdvancement(3051, 3061, 3067, DATE_NONE, DATE_NONE)
+          .setISApproximate(true, false, false, false, false).setPrototypeFactions(F_FW)
+          .setProductionFactions(F_FC);
       return ammo;
     }
   }
