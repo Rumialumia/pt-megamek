@@ -68,6 +68,15 @@ import megamek.common.weapons.tag.CLTAG;
 import megamek.common.weapons.tag.ISTAG;
 import megamek.common.weapons.unofficial.*;
 
+/**
+ * @author Rumia
+ * @since Feb 25, 2024
+ */
+// Piratetech
+import megamek.common.weapons.piratetech.autocannons.*;
+import megamek.common.weapons.piratetech.gaussrifles.*;
+import megamek.common.weapons.piratetech.lasers.*;
+
 // TODO add XML support back in.
 
 /**
@@ -1362,8 +1371,8 @@ public class WeaponType extends EquipmentType {
         EquipmentType.addType(new CLPlasmaRifle());
         EquipmentType.addType(new CLRAC2());
         EquipmentType.addType(new CLRAC5());
-        EquipmentType.addType(new CLRAC10());
-        EquipmentType.addType(new CLRAC20());
+        //EquipmentType.addType(new CLRAC10());
+        //EquipmentType.addType(new CLRAC20());
 
         // misc lvl3 stuff
         EquipmentType.addType(new ISRailGun());
@@ -2178,6 +2187,24 @@ public class WeaponType extends EquipmentType {
         EquipmentType.addType(new ISAPDS());
         EquipmentType.addType(new ISBAAPDS());
         EquipmentType.addType(new ISRISCHyperLaser());
+
+        /**
+        * @author Rumia
+        * @since Feb 25, 2024
+        */
+        // Piratetech Weapons
+        EquipmentType.addType(new PTISRAC10());
+        EquipmentType.addType(new PTISRAC20());
+        EquipmentType.addType(new ISHVAC20());
+        EquipmentType.addType(new PBallista());
+        EquipmentType.addType(new PHBallista());
+        EquipmentType.addType(new PLBallista());
+        EquipmentType.addType(new PCannon());
+        EquipmentType.addType(new ISMBinaryLaserCannon());
+        EquipmentType.addType(new ISSBinaryLaserCannon());
+        EquipmentType.addType(new CLHAG10());
+        EquipmentType.addType(new ISSilverBulletHeavyGauss());
+        EquipmentType.addType(new ISSilverBulletLightGauss());
     }
 
     public int getExplosionDamage() {

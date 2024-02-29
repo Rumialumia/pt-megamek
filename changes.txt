@@ -1,0 +1,21 @@
+/megamek/src/megamek/common/WeaponType.java 					                            - added info for ISHVAC20, PTISRAC10, PTISRAC20, PBallista, PHBallista, PLBallista, 2/25/24, Rumia
+/megamek/src/megamek/common/WeaponType.java 					                            - commented out base clan rac10/rac20, 2/25/24, Rumia
+/megamek/src/megamek/common/WeaponType.java 					                            - commented out base is rac10/rac20, 2/25/24, Rumia
+/megamek/src/megamek/common/AmmoType.java 					                                - added info for ISHVAC20, PTISRAC10, PTISRAC20, PBallista, PHBallista, PLBallista, 2/25/24, Rumia
+/megamek/src/megamek/common/AmmoType.java 					                                - added new ammo type enums for Ball, 2/25/24, Rumia
+/megamek/src/megamek/common/weapons/piratetech/autocannons/ISHVAC20.java	                - added new weapon, 2/25/24, Rumia
+/megamek/src/megamek/common/weapons/piratetech/autocannons/PTISRAC10.java	                - added new weapon, 2/25/24, Rumia
+/megamek/src/megamek/common/weapons/piratetech/autocannons/PTISRAC20.java	                - added new weapon, 2/25/24, Rumia
+/megamek/src/megamek/common/weapons/piratetech/gaussrifles/PBallista.java	                - added new weapon, 2/25/24, Rumia
+/megamek/src/megamek/common/weapons/piratetech/gaussrifles/PHBallista.java	                - added new weapon, 2/25/24, Rumia
+/megamek/src/megamek/common/weapons/piratetech/gaussrifles/PLBallista.java	                - added new weapon, 2/25/24, Rumia
+/megamek/src/megamek/common/weapons/piratetech/lasers/ISMBinaryLaserCannon.java	            - added new weapon, 2/26/24, Meows
+/megamek/src/megamek/common/weapons/piratetech/lasers/ISSBinaryLaserCannon.java	            - added new weapon, 2/26/24, Meows
+/megamek/src/megamek/common/weapons/lasers/ISBinaryLaserCannon.java                         - removed protomech restrictions, 2/26/24, Rumia
+/megamek/src/megamek/common/AmmoType.java                                                   - Added Light and Heavy Silver Bullet Gauss Ammo, Clan Hag 10 Ammo, and added enums for the new Silver Bullet Types, 2/27/24, Rumia
+/megamek/src/megamek/common/verifier/TestMech.java                                          - Added Heavy Ballista and Heavy Silver Bullet Gauss to be restricted to the torso, 2/27/24, Rumia
+/megamek/src/megamek/common/weapons/HSBGHandler.java                                        - Created to merge LBX and HGR functionality for the Heavy Silver Bullet Gauss Rifle, 2/27/24, Rumia
+/megamek/src/megamek/common/weapons/piratetech/gaussrifles/CLHAG10.java                     - added new weapon, 2/26/24, Meows
+/megamek/src/megamek/common/weapons/piratetech/gaussrifles/ISSilverBulletHeavyGauss.java    - added new weapon, 2/26/24, Meows
+/megamek/src/megamek/common/weapons/piratetech/gaussrifles/ISSilverBulletLightGauss.java    - added new weapon, 2/26/24, Meows
+/megamek/src/megamek/common/WeaponType.java                                                 - added info for ISSilverBulletHeavyGauss, ISSilverBulletLightGauss, CLHAG10, 2/26/24, Rumia
