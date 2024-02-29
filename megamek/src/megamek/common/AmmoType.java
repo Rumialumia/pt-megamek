@@ -155,8 +155,13 @@ public class AmmoType extends EquipmentType {
     public static final int T_BALLISTA_HEAVY = 115;
     public static final int T_BALLISTA_LIGHT = 116;
     public static final int T_AC_CANNON = 117;
+    public static final int T_SBLGAUSS = 118;
+    public static final int T_SBHGAUSS = 119;
 
-    public static final int NUM_TYPES = 118; // Should always be at the end with the highest number
+
+
+  public static final int NUM_TYPES = 120; // Should always be at the end with the highest number
+
 
   /**
      * Contains the {@code AmmoType}s that could share ammo (e.g. SRM 2 and SRM 6,
@@ -1420,6 +1425,9 @@ public class AmmoType extends EquipmentType {
         EquipmentType.addType(AmmoType.createPBallistaAmmo());
         EquipmentType.addType(AmmoType.createPLTBallistaAmmo());
         EquipmentType.addType(AmmoType.createPHVBallistaAmmo());
+        EquipmentType.addType(AmmoType.createISHSBGaussRifleAmmo());
+        EquipmentType.addType(AmmoType.createISLSBGaussRifleAmmo());
+        EquipmentType.addType(AmmoType.createCLHAG10Ammo());
 
 
         // Create the munition types for IS Mek mortars
@@ -14524,7 +14532,7 @@ public class AmmoType extends EquipmentType {
       ammo.addLookupName("Pirate Ammo Ballista");
       ammo.damagePerShot = 11;
       ammo.explosive = false;
-      ammo.ammoType = AmmoType.T_GAUSS;
+      ammo.ammoType = AmmoType.T_BALLISTA;
       ammo.shots = 16;
       ammo.bv = 30;
       ammo.cost = 10000;
@@ -14550,7 +14558,7 @@ public class AmmoType extends EquipmentType {
       ammo.addLookupName("PirateLightBallista Ammo");
       ammo.damagePerShot = 6;
       ammo.explosive = false;
-      ammo.ammoType = AmmoType.T_GAUSS_LIGHT;
+      ammo.ammoType = AmmoType.T_BALLISTA_LIGHT;
       ammo.shots = 24;
       ammo.bv = 15;
       ammo.cost = 10000;
@@ -14575,7 +14583,7 @@ public class AmmoType extends EquipmentType {
       ammo.addLookupName("ISHeavyGaussRifle Ammo");
       ammo.damagePerShot = 19; // actually variable
       ammo.explosive = false;
-      ammo.ammoType = AmmoType.T_GAUSS_HEAVY;
+      ammo.ammoType = AmmoType.T_BALLISTA_HEAVY;
       ammo.shots = 8;
       ammo.bv = 31;
       ammo.cost = 10000;
@@ -14632,6 +14640,88 @@ public class AmmoType extends EquipmentType {
           .setAvailability(RATING_C)
           .setISAdvancement(3047)
           .setISApproximate(false, false, false, false, false);
+      return ammo;
+    }
+
+    private static AmmoType createISHSBGaussRifleAmmo() {
+      AmmoType ammo = new AmmoType();
+
+      ammo.name = "Silver Bullet Heavy Gauss Rifle Ammo";
+      ammo.shortName = "Silver Bullet Heavy";
+      ammo.setInternalName("Silver Bullet Heavy Gauss Ammo");
+      ammo.addLookupName("IS SBHGauss Rifle Ammo");
+      ammo.addLookupName("ISSBHGauss Ammo");
+      ammo.addLookupName("ISSBHGaussRifleAmmo");
+      ammo.explosive = false;
+      ammo.damagePerShot = 1;
+      ammo.rackSize = 22;
+      ammo.ammoType = AmmoType.T_SBHGAUSS;
+      ammo.munitionType = EnumSet.of(Munitions.M_CLUSTER);
+      ammo.shots =4;
+      ammo.bv = 43;
+      ammo.cost = 20000;
+      ammo.toHitModifier = -1;
+      ammo.rulesRefs = "314, TO";
+      // Tech Progression tweaked to combine IntOps with TRO Prototypes/3145 NTNU RS
+      ammo.techAdvancement.setTechBase(TECH_BASE_IS).setTechRating(RATING_E)
+          .setAvailability(RATING_X, RATING_X, RATING_F, RATING_E)
+          .setISAdvancement(3051, DATE_NONE, 3080, DATE_NONE, DATE_NONE)
+          .setPrototypeFactions(F_FS, F_LC)
+          .setProductionFactions(F_FC).setStaticTechLevel(SimpleTechLevel.STANDARD);
+      return ammo;
+    }
+
+    private static AmmoType createISLSBGaussRifleAmmo() {
+      AmmoType ammo = new AmmoType();
+
+      ammo.name = "Silver Bullet Light Gauss Rifle Ammo";
+      ammo.shortName = "Silver Bullet Light";
+      ammo.setInternalName("Silver Bullet Light Gauss Ammo");
+      ammo.addLookupName("IS SBLGauss Rifle Ammo");
+      ammo.addLookupName("ISSBLGauss Ammo");
+      ammo.addLookupName("ISSBLGaussRifleAmmo");
+      ammo.explosive = false;
+      ammo.damagePerShot = 1;
+      ammo.rackSize = 8;
+      ammo.ammoType = AmmoType.T_SBLGAUSS;
+      ammo.munitionType = EnumSet.of(Munitions.M_CLUSTER);
+      ammo.shots = 16;
+      ammo.bv = 20;
+      ammo.cost = 20000;
+      ammo.toHitModifier = -1;
+      ammo.rulesRefs = "314, TO";
+      // Tech Progression tweaked to combine IntOps with TRO Prototypes/3145 NTNU RS
+      ammo.techAdvancement.setTechBase(TECH_BASE_IS).setTechRating(RATING_E)
+          .setAvailability(RATING_X, RATING_X, RATING_F, RATING_E)
+          .setISAdvancement(3051, DATE_NONE, 3080, DATE_NONE, DATE_NONE)
+          .setPrototypeFactions(F_FS, F_LC)
+          .setProductionFactions(F_FC).setStaticTechLevel(SimpleTechLevel.STANDARD);
+      return ammo;
+    }
+
+    private static AmmoType createCLHAG10Ammo() {
+      AmmoType ammo = new AmmoType();
+
+      ammo.name = "Hyper-Assault Gauss Rifle/10 Ammo";
+      ammo.shortName = "HAG/10";
+      ammo.setInternalName(ammo.name);
+      ammo.addLookupName("CLHAG10 Ammo");
+      ammo.addLookupName("Clan HAG 10 Ammo");
+      ammo.addLookupName("HAG/10 Ammo");
+      ammo.damagePerShot = 1;
+      ammo.rackSize = 10;
+      ammo.ammoType = AmmoType.T_HAG;
+      ammo.shots = 12;
+      ammo.bv = 33;
+      ammo.cost = 30000;
+      ammo.kgPerShot = 166.66;
+      ammo.explosive = false;
+      ammo.rulesRefs = "219, TM";
+      ammo.techAdvancement.setTechBase(TECH_BASE_CLAN).setIntroLevel(false).setUnofficial(false)
+          .setTechRating(RATING_F).setAvailability(RATING_X, RATING_F, RATING_E, RATING_D)
+          .setClanAdvancement(3062, 3068, 3072, DATE_NONE, DATE_NONE)
+          .setClanApproximate(true, false, false, false, false).setPrototypeFactions(F_CHH)
+          .setProductionFactions(F_CHH);
       return ammo;
     }
   }

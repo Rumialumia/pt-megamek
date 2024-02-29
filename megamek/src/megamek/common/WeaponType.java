@@ -2202,6 +2202,9 @@ public class WeaponType extends EquipmentType {
         EquipmentType.addType(new PCannon());
         EquipmentType.addType(new ISMBinaryLaserCannon());
         EquipmentType.addType(new ISSBinaryLaserCannon());
+        EquipmentType.addType(new CLHAG10());
+        EquipmentType.addType(new ISSilverBulletHeavyGauss());
+        EquipmentType.addType(new ISSilverBulletLightGauss());
     }
 
     public int getExplosionDamage() {
