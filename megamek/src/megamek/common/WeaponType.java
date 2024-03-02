@@ -59,6 +59,7 @@ import megamek.common.weapons.mortars.ISMekMortar4;
 import megamek.common.weapons.mortars.ISMekMortar8;
 import megamek.common.weapons.mortars.ISVehicularGrenadeLauncher;
 import megamek.common.weapons.other.*;
+import megamek.common.weapons.piratetech.misc.PBurnBarrel;
 import megamek.common.weapons.ppc.*;
 import megamek.common.weapons.primitive.*;
 import megamek.common.weapons.prototypes.*;
@@ -225,6 +226,8 @@ public class WeaponType extends EquipmentType {
     // Used for TSEMP Weapons.
     public static final BigInteger F_TSEMP = BigInteger.valueOf(1).shiftLeft(57);
     public static final BigInteger F_REPEATING = BigInteger.valueOf(1).shiftLeft(72);
+
+    public static final BigInteger F_BURNBARREL = BigInteger.valueOf(1).shiftLeft(73);
 
     // add maximum range for AT2
     public static final int RANGE_SHORT = RangeType.RANGE_SHORT;
@@ -416,12 +419,14 @@ public class WeaponType extends EquipmentType {
     public int getHeat() {
         return heat;
     }
-
+    // Added Pirate Burn Barrel
     public int getFireTN() {
         if (hasFlag(F_NO_FIRES)) {
             return TargetRoll.IMPOSSIBLE;
         } else if (hasFlag(F_FLAMER)) {
-            return 4;
+          return 4;
+        } else if (hasFlag(F_BURNBARREL)) {
+          return 0;
         } else if (hasFlag(F_PLASMA)) {
             return 2;
         } else if (hasFlag(F_PLASMA_MFUK)) {
@@ -2205,6 +2210,7 @@ public class WeaponType extends EquipmentType {
         EquipmentType.addType(new CLHAG10());
         EquipmentType.addType(new ISSilverBulletHeavyGauss());
         EquipmentType.addType(new ISSilverBulletLightGauss());
+        EquipmentType.addType(new PBurnBarrel());
     }
 
     public int getExplosionDamage() {

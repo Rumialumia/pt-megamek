@@ -157,10 +157,12 @@ public class AmmoType extends EquipmentType {
     public static final int T_AC_CANNON = 117;
     public static final int T_SBLGAUSS = 118;
     public static final int T_SBHGAUSS = 119;
+    public static final int T_BURNBARREL = 120;
 
 
 
-  public static final int NUM_TYPES = 120; // Should always be at the end with the highest number
+    public static final int NUM_TYPES = 121; // Should always be at the end with the highest number
+
 
 
   /**
@@ -1428,6 +1430,7 @@ public class AmmoType extends EquipmentType {
         EquipmentType.addType(AmmoType.createISHSBGaussRifleAmmo());
         EquipmentType.addType(AmmoType.createISLSBGaussRifleAmmo());
         EquipmentType.addType(AmmoType.createCLHAG10Ammo());
+        EquipmentType.addType(AmmoType.createPBurnBarrelAmmo());
 
 
         // Create the munition types for IS Mek mortars
@@ -14722,6 +14725,31 @@ public class AmmoType extends EquipmentType {
           .setClanAdvancement(3062, 3068, 3072, DATE_NONE, DATE_NONE)
           .setClanApproximate(true, false, false, false, false).setPrototypeFactions(F_CHH)
           .setProductionFactions(F_CHH);
+      return ammo;
+    }
+    private static AmmoType createPBurnBarrelAmmo() {
+      AmmoType ammo = new AmmoType();
+
+      ammo.name = "Pirate Burn Barrel Ammo";
+      ammo.shortName = "Pirate Burn Barrel";
+      ammo.setInternalName("PBurnBarrelAmmo");
+      ammo.addLookupName("PBurnBarrel Ammo");
+      ammo.damagePerShot = 0;
+      ammo.rackSize = 2;
+      ammo.ammoType = AmmoType.T_BURNBARREL;
+      ammo.shots = 8;
+      ammo.bv = 19;
+      ammo.cost = 15000;
+      ammo.explosive = false;
+      ammo.rulesRefs = "234, TM";
+      ammo.kgPerShot = 100;
+      ammo.techAdvancement.setTechBase(TECH_BASE_IS)
+          .setIntroLevel(false)
+          .setUnofficial(false)
+          .setTechRating(RATING_B)
+          .setAvailability(RATING_C)
+          .setISAdvancement(3047)
+          .setISApproximate(true);
       return ammo;
     }
   }
