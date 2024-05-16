@@ -17,6 +17,7 @@ package megamek.common.verifier;
 import megamek.common.*;
 import megamek.common.annotations.Nullable;
 import megamek.common.equipment.ArmorType;
+import megamek.common.equipment.WeaponMounted;
 import megamek.common.util.StringUtil;
 import megamek.common.weapons.artillery.ArtilleryWeapon;
 import megamek.common.weapons.autocannons.ACWeapon;
@@ -206,42 +207,34 @@ public class TestMech extends TestEntity {
     }
 
     public double getWeightCockpit() {
-        double weight = 3.0;
-        if (mech.getCockpitType() == Mech.COCKPIT_SMALL) {
-            weight = 2.0;
-        } else if (mech.getCockpitType() == Mech.COCKPIT_TORSO_MOUNTED) {
-            weight = 4.0;
-        } else if (mech.getCockpitType() == Mech.COCKPIT_COMMAND_CONSOLE) {
-            // Technically, it's two separate 3-ton pieces of equipment.
-            // We're ignoring that and returning the total, because it's easier.
-            weight = 6.0;
-        } else if (mech.getCockpitType() == Mech.COCKPIT_DUAL) {
-            // Solaris VII - The Game World (German) This is not actually
-            // canonical as it
-            // has never been repeated in any English language source including
-            // Tech Manual
-            weight = 4.0;
-        } else if (mech.getCockpitType() == Mech.COCKPIT_PRIMITIVE) {
-            weight = 5.0;
-        } else if (mech.getCockpitType() == Mech.COCKPIT_PRIMITIVE_INDUSTRIAL) {
-            weight = 5.0;
-        } else if ((mech.getCockpitType() == Mech.COCKPIT_SUPERHEAVY) || (mech.getCockpitType() == Mech.COCKPIT_TRIPOD)) {
-            weight = 4.0;
-        } else if (mech.getCockpitType() == Mech.COCKPIT_SUPERHEAVY_TRIPOD) {
-            weight = 5.0;
-        } else if (mech.getCockpitType() == Mech.COCKPIT_INTERFACE) {
-            weight = 4.0;
-        } else if (mech.getCockpitType() == Mech.COCKPIT_QUADVEE) {
-            weight = 4.0;
-        } else if (mech.getCockpitType() == Mech.COCKPIT_SUPERHEAVY_COMMAND_CONSOLE) {
-            // Like as normal command console, it is technically two seperate 4-ton and 3-ton pieces of equipment.
-            weight = 7.0;
-        } else if (mech.getCockpitType() == Mech.COCKPIT_SMALL_COMMAND_CONSOLE) {
-            // Like as normal command console, it is technically two seperate 2-ton and 3-ton pieces of equipment.
-            weight = 5.0;
+        switch (mech.getCockpitType()) {
+            case Mech.COCKPIT_SMALL:
+                return 2.0;
+            case Mech.COCKPIT_TORSO_MOUNTED:
+            case Mech.COCKPIT_DUAL:
+            case Mech.COCKPIT_SUPERHEAVY:
+            case Mech.COCKPIT_SUPERHEAVY_INDUSTRIAL:
+            case Mech.COCKPIT_TRIPOD:
+            case Mech.COCKPIT_TRIPOD_INDUSTRIAL:
+            case Mech.COCKPIT_INTERFACE:
+            case Mech.COCKPIT_QUADVEE:
+                return 4.0;
+            case Mech.COCKPIT_PRIMITIVE:
+            case Mech.COCKPIT_PRIMITIVE_INDUSTRIAL:
+            case Mech.COCKPIT_SUPERHEAVY_TRIPOD:
+            case Mech.COCKPIT_SUPERHEAVY_TRIPOD_INDUSTRIAL:
+            case Mech.COCKPIT_SMALL_COMMAND_CONSOLE:
+                return 5.0;
+            case Mech.COCKPIT_COMMAND_CONSOLE:
+                return 6.0;
+            case Mech.COCKPIT_SUPERHEAVY_COMMAND_CONSOLE:
+                return 7.0;
+            case Mech.COCKPIT_STANDARD:
+            case Mech.COCKPIT_INDUSTRIAL:
+            case Mech.COCKPIT_VRRP:
+            default:
+                return 3.0;
         }
-
-        return weight;
     }
 
     public double getWeightGyro() {
@@ -1018,8 +1011,7 @@ public class TestMech extends TestEntity {
                     buff.append("industrial mech can't mount ").append(misc.getName()).append("\n");
                     illegal = true;
                 }
-                if ((mech.getCockpitType() == Mech.COCKPIT_INDUSTRIAL
-                        || mech.getCockpitType() == Mech.COCKPIT_PRIMITIVE_INDUSTRIAL)
+                if (!mech.hasAdvancedFireControl()
                     && (misc.hasFlag(MiscType.F_TARGCOMP)
                         || misc.hasFlag(MiscType.F_ARTEMIS)
                         || misc.hasFlag(MiscType.F_ARTEMIS_PROTO)
@@ -1401,26 +1393,29 @@ public class TestMech extends TestEntity {
                 }
             }
         }
-        // Modified with SBHGauss
-        for (Mounted m : mech.getWeaponList()) {
-            if (   (((WeaponType) m.getType()).getAmmoType() == AmmoType.T_GAUSS_HEAVY)
-                || (((WeaponType) m.getType()).getAmmoType() == AmmoType.T_IGAUSS_HEAVY)
-                || (((WeaponType) m.getType()).getAmmoType() == AmmoType.T_BALLISTA_HEAVY)
-                || (((WeaponType) m.getType()).getAmmoType() == AmmoType.T_SBHGAUSS)) {
+
+        for (WeaponMounted m : mech.getWeaponList()) {
+            if ((m.getType().getAmmoType() == AmmoType.T_GAUSS_HEAVY)
+                    || (m.getType().getAmmoType() == AmmoType.T_IGAUSS_HEAVY)) {
                 boolean torso = mech.locationIsTorso(m.getLocation());
                 if (m.getSecondLocation() != Entity.LOC_NONE) {
-                  torso = torso && mech.locationIsTorso(m.getSecondLocation());
+                    torso = torso && mech.locationIsTorso(m.getSecondLocation());
                 }
                 if (!mech.isSuperHeavy() && !torso) {
-                  buff.append("Heavy Gauss can only be mounted in a torso location.\n");
-                  illegal = true;
+                    buff.append("Heavy Gauss can only be mounted in a torso location.\n");
+                    illegal = true;
+                }
+
+                if (m.isMechTurretMounted()) {
+                    buff.append("Heavy Gauss cannot be mounted in a turret.\n");
+                    illegal = true;
                 }
             }
             if ((m.getType().hasFlag(WeaponType.F_TASER)
-                || m.getType().hasFlag(WeaponType.F_HYPER))
-                && !(mech.hasEngine() && mech.getEngine().isFusion())) {
-              buff.append(m.getType().getName()).append(" needs fusion engine\n");
-              illegal = true;
+                    || m.getType().hasFlag(WeaponType.F_HYPER))
+                    && !(mech.hasEngine() && mech.getEngine().isFusion())) {
+                buff.append(m.getType().getName()).append(" needs fusion engine\n");
+                illegal = true;
             }
         }
 
@@ -1647,13 +1642,8 @@ public class TestMech extends TestEntity {
                 }
                 return false;
             }
-
-            // Modified by Rumia 2/27/2024
             if (((((WeaponType) eq).getAmmoType() == AmmoType.T_GAUSS_HEAVY)
-                    || ((WeaponType) eq).getAmmoType() == AmmoType.T_SBHGAUSS
-                    || ((WeaponType) eq).getAmmoType() == AmmoType.T_BALLISTA_HEAVY
                     || ((WeaponType) eq).getAmmoType() == AmmoType.T_IGAUSS_HEAVY)
-
                     && !mech.isSuperHeavy() && !mech.locationIsTorso(location)) {
                 if (buffer != null) {
                     buffer.append(eq.getName()).append(" must be placed in a torso location.\n");

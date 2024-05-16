@@ -13,8 +13,6 @@
  */
 package megamek.common.weapons.autocannons;
 
-import megamek.common.SimpleTechLevel;
-
 /**
  * @author Andrew Hunter
  * @since Oct 1, 2004

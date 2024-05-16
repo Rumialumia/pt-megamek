@@ -20,8 +20,8 @@ import megamek.client.ui.baseComponents.AbstractButtonDialog;
 import megamek.client.ui.swing.util.UIUtil;
 import megamek.common.*;
 import megamek.common.enums.Gender;
+import megamek.common.equipment.WeaponMounted;
 import megamek.common.options.*;
-import megamek.common.util.fileUtils.MegaMekFile;
 import megamek.common.verifier.*;
 import megamek.common.weapons.bayweapons.ArtilleryBayWeapon;
 import megamek.common.weapons.bayweapons.CapitalMissileBayWeapon;
@@ -397,6 +397,11 @@ public class CustomMechDialog extends AbstractButtonDialog implements ActionList
     @Override
     public void optionClicked(DialogOptionComponent comp, IOption option, boolean state) { }
 
+    @Override
+    public void optionSwitched(DialogOptionComponent clickedComp, IOption option, int i) {
+        // nothing implemented yet
+    }
+
     public boolean isOkay() {
         return okay;
     }
@@ -478,8 +483,10 @@ public class CustomMechDialog extends AbstractButtonDialog implements ActionList
         txtDeploymentOffset.setText(Integer.toString(entity.getStartingOffset(false)));
         txtDeploymentWidth.setText(Integer.toString(entity.getStartingWidth(false)));
 
-        int bh = clientgui.getClient().getMapSettings().getBoardHeight();
-        int bw = clientgui.getClient().getMapSettings().getBoardWidth();
+        MapSettings ms = clientgui.getClient().getMapSettings();
+        int bh = ms.getBoardHeight() * ms.getMapHeight();
+        int bw = ms.getBoardWidth() * ms.getMapWidth();
+
         int x = Math.min(entity.getStartingAnyNWx(false) + 1, bw);
         spinStartingAnyNWx.setValue(x);
         int y = Math.min(entity.getStartingAnyNWy(false) + 1, bh);
@@ -515,20 +522,17 @@ public class CustomMechDialog extends AbstractButtonDialog implements ActionList
             // effective range, even if many of the unit's weapons would be out of range
             int maxDistance = 0;
             for (Entity entity : entities) {
-                for (Mounted wep : entity.getWeaponList()) {
-                    EquipmentType e = wep.getType();
-                    WeaponType w = (WeaponType) e;
+                for (WeaponMounted wep : entity.getWeaponList()) {
+                    WeaponType w = wep.getType();
                     int nDistance = 0;
                     if (w.hasFlag(WeaponType.F_ARTILLERY)) {
                         if (w instanceof ArtilleryBayWeapon) {
                             // Artillery bays can mix and match, so limit the bay
                             // to the shortest range of the weapons in it
                             int bayShortestRange = 150; // Cruise missile/120
-                            for (int wId : wep.getBayWeapons()) {
-                                Mounted bweap = entity.getEquipment(wId);
-                                WeaponType bwtype = (WeaponType) bweap.getType();
+                            for (WeaponMounted bweap : wep.getBayWeapons()) {
                                 // Max TO range in mapsheets - 1 for the actual play area
-                                int currentDistance = (bwtype.getLongRange() - 1);
+                                int currentDistance = (bweap.getType().getLongRange() - 1);
                                 if (currentDistance < bayShortestRange) {
                                     bayShortestRange = currentDistance;
                                 }

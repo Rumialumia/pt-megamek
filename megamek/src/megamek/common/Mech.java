@@ -20,6 +20,7 @@ import megamek.client.ui.swing.calculationReport.CalculationReport;
 import megamek.common.cost.MekCostCalculator;
 import megamek.common.enums.AimingMode;
 import megamek.common.enums.MPBoosters;
+import megamek.common.equipment.MiscMounted;
 import megamek.common.loaders.MtfFile;
 import megamek.common.options.IBasicOption;
 import megamek.common.options.IOption;
@@ -161,6 +162,10 @@ public abstract class Mech extends Entity {
 
     public static final int COCKPIT_SMALL_COMMAND_CONSOLE = 16;
 
+    public static final int COCKPIT_TRIPOD_INDUSTRIAL = 17;
+
+    public static final int COCKPIT_SUPERHEAVY_TRIPOD_INDUSTRIAL = 18;
+
     public static final String[] COCKPIT_STRING = { "Standard Cockpit",
             "Small Cockpit", "Command Console", "Torso-Mounted Cockpit",
             "Dual Cockpit", "Industrial Cockpit", "Primitive Cockpit",
@@ -168,14 +173,14 @@ public abstract class Mech extends Entity {
             "Superheavy Tripod Cockpit", "Tripod Cockpit", "Interface Cockpit",
             "Virtual Reality Piloting Pod", "QuadVee Cockpit",
             "Superheavy Industrial Cockpit", "Superheavy Command Console",
-        "Small Command Console"};
+            "Small Command Console", "Tripod Industrial Cockpit", "Superheavy Tripod Industrial Cockpit" };
 
     public static final String[] COCKPIT_SHORT_STRING = { "Standard", "Small",
             "Command Console", "Torso Mounted", "Dual", "Industrial",
             "Primitive", "Primitive Industrial", "Superheavy",
-            "Superheavy Tripod", "Tripod", "Interface", "VRRP", "Quadvee",
+            "Superheavy Tripod", "Tripod", "Interface", "VRPP", "Quadvee",
             "Superheavy Industrial", "Superheavy Command",
-            "Small Command"};
+            "Small Command", "Tripod Industrial", "Superheavy Tripod Industrial" };
 
     public static final String FULL_HEAD_EJECT_STRING = "Full Head Ejection System";
 
@@ -326,9 +331,11 @@ public abstract class Mech extends Entity {
 
         switch (inCockpitType) {
             case COCKPIT_TRIPOD:
+            case COCKPIT_TRIPOD_INDUSTRIAL:
                 setCrew(new Crew(CrewType.TRIPOD));
                 break;
             case COCKPIT_SUPERHEAVY_TRIPOD:
+            case COCKPIT_SUPERHEAVY_TRIPOD_INDUSTRIAL:
                 setCrew(new Crew(CrewType.SUPERHEAVY_TRIPOD));
                 break;
             case COCKPIT_DUAL:
@@ -1125,34 +1132,34 @@ public abstract class Mech extends Entity {
         if (!mpCalculationSetting.ignoreWeather && (game != null)) {
             if ((getWeightClass() <= EntityWeightClass.WEIGHT_MEDIUM)) {
                 switch (game.getPlanetaryConditions().getAtmosphere()) {
-                    case PlanetaryConditions.ATMO_VACUUM:
-                    case PlanetaryConditions.ATMO_TRACE:
+                    case VACUUM:
+                    case TRACE:
                         bonus = 0;
                         break;
-                    case PlanetaryConditions.ATMO_THIN:
+                    case THIN:
                         bonus = 1;
                         break;
-                    case PlanetaryConditions.ATMO_VHIGH:
+                    case VERY_HIGH:
                         bonus = 3;
                         break;
-                    case PlanetaryConditions.ATMO_STANDARD:
-                    case PlanetaryConditions.ATMO_HIGH:
+                    case STANDARD:
+                    case HIGH:
                     default:
                         bonus = 2;
                         break;
                 }
             } else {
                 switch (game.getPlanetaryConditions().getAtmosphere()) {
-                    case PlanetaryConditions.ATMO_VACUUM:
-                    case PlanetaryConditions.ATMO_TRACE:
-                    case PlanetaryConditions.ATMO_THIN:
+                    case VACUUM:
+                    case TRACE:
+                    case THIN:
                         bonus = 0;
                         break;
-                    case PlanetaryConditions.ATMO_HIGH:
-                    case PlanetaryConditions.ATMO_VHIGH:
+                    case HIGH:
+                    case VERY_HIGH:
                         bonus = 2;
                         break;
-                    case PlanetaryConditions.ATMO_STANDARD:
+                    case STANDARD:
                     default:
                         bonus = 1;
                 }
@@ -1191,18 +1198,18 @@ public abstract class Mech extends Entity {
         int bonus;
         if (game != null) {
             switch (game.getPlanetaryConditions().getAtmosphere()) {
-                case PlanetaryConditions.ATMO_VACUUM:
+                case VACUUM:
                     bonus = 0;
                     break;
-                case PlanetaryConditions.ATMO_TRACE:
+                case TRACE:
                     bonus = 1;
                     break;
-                case PlanetaryConditions.ATMO_THIN:
+                case THIN:
                     bonus = 2;
                     break;
-                case PlanetaryConditions.ATMO_STANDARD:
-                case PlanetaryConditions.ATMO_HIGH:
-                case PlanetaryConditions.ATMO_VHIGH:
+                case STANDARD:
+                case HIGH:
+                case VERY_HIGH:
                 default:
                     bonus = 3;
                     break;
@@ -1410,7 +1417,7 @@ public abstract class Mech extends Entity {
 
         for (int i = 0; i < toAllocate; i++) {
             try {
-                addEquipment(new Mounted(this, sinkType), Entity.LOC_NONE, false);
+                addEquipment(Mounted.createMounted(this, sinkType), Entity.LOC_NONE, false);
             } catch (LocationFullException ignored) {
                 // um, that's impossible.
             }
@@ -2737,7 +2744,7 @@ public abstract class Mech extends Entity {
             }
             if (explosiveFound) {
                 try {
-                    addEquipment(new Mounted(this, clCase), i, false);
+                    addEquipment(Mounted.createMounted(this, clCase), i, false);
                 } catch (LocationFullException ex) {
                     // um, that's impossible.
                 }
@@ -2745,10 +2752,22 @@ public abstract class Mech extends Entity {
         }
     }
 
+    /**
+     * Adds equipment without adding slots for it.
+     * Specifically for targeting computers, which when loaded from a file don't have a correct size and get loaded slot by slot
+     */
+    public MiscMounted addTargCompWithoutSlots(MiscType etype, int loc, boolean omniPod, boolean armored) throws LocationFullException {
+        MiscMounted mounted = (MiscMounted) MiscMounted.createMounted(this, etype);
+        mounted.setOmniPodMounted(omniPod);
+        mounted.setArmored(armored);
+        super.addEquipment(mounted, loc, false);
+        return mounted;
+    }
+
     public Mounted addEquipment(EquipmentType etype, EquipmentType etype2,
             int loc,  boolean omniPod, boolean armored) throws LocationFullException {
-        Mounted mounted = new Mounted(this, etype);
-        Mounted mounted2 = new Mounted(this, etype2);
+        Mounted mounted = Mounted.createMounted(this, etype);
+        Mounted mounted2 = Mounted.createMounted(this, etype2);
         mounted.setOmniPodMounted(omniPod);
         mounted2.setOmniPodMounted(omniPod);
         mounted.setArmored(armored);
@@ -3055,6 +3074,16 @@ public abstract class Mech extends Entity {
                 .setPrototypeFactions(F_FS).setProductionFactions(F_FS, F_CJF)
                 .setAvailability(RATING_X, RATING_X, RATING_E, RATING_D)
                 .setStaticTechLevel(SimpleTechLevel.ADVANCED), //Small Command Console
+            new TechAdvancement(TECH_BASE_IS).setISAdvancement(3130, 3135)
+                    .setISApproximate(true, false).setTechRating(RATING_E)
+                    .setPrototypeFactions(F_RS).setProductionFactions(F_RS)
+                    .setAvailability(RATING_X, RATING_F, RATING_X, RATING_F)
+                    .setStaticTechLevel(SimpleTechLevel.ADVANCED), //Superheavy tripod
+            new TechAdvancement(TECH_BASE_IS).setISAdvancement(2590, 2702)
+                    .setISApproximate(true, false).setTechRating(RATING_F)
+                    .setPrototypeFactions(F_TH).setProductionFactions(F_TH)
+                    .setAvailability(RATING_X, RATING_X, RATING_X, RATING_F)
+                    .setStaticTechLevel(SimpleTechLevel.ADVANCED), //Tripod
     };
 
     // Advanced fire control for industrial mechs is implemented with a standard cockpit,
@@ -3075,9 +3104,6 @@ public abstract class Mech extends Entity {
     }
 
     public TechAdvancement getCockpitTechAdvancement() {
-        if (isIndustrial() && (getCockpitType() == COCKPIT_STANDARD)) {
-            return getIndustrialAdvFireConTA();
-        }
         return getCockpitTechAdvancement(getCockpitType());
     }
 
@@ -3114,6 +3140,9 @@ public abstract class Mech extends Entity {
         }
         if (getCockpitTechAdvancement() != null) {
             ctl.addComponent(getCockpitTechAdvancement());
+        }
+        if (isIndustrial() && hasAdvancedFireControl()) {
+            ctl.addComponent(getIndustrialAdvFireConTA());
         }
         if (hasFullHeadEject()) {
             ctl.addComponent(getFullHeadEjectAdvancement());
@@ -3909,18 +3938,26 @@ public abstract class Mech extends Entity {
         return Mech.getGyroTypeString(getGyroType());
     }
 
-    public String getCockpitTypeString() {
-        if (isIndustrial()) {
-            switch (getCockpitType()) {
+    public static String getCockpitTypeString(int cockpitType, boolean industrial) {
+        if (industrial) {
+            switch (cockpitType) {
                 case COCKPIT_STANDARD:
                     return Mech.getCockpitTypeString(COCKPIT_INDUSTRIAL) + " (Adv. FCS)";
                 case COCKPIT_PRIMITIVE:
                     return Mech.getCockpitTypeString(COCKPIT_PRIMITIVE_INDUSTRIAL) + " (Adv. FCS)";
                 case COCKPIT_SUPERHEAVY:
                     return Mech.getCockpitTypeString(COCKPIT_SUPERHEAVY_INDUSTRIAL) + " (Adv. FCS)";
+                case COCKPIT_TRIPOD:
+                    return Mech.getCockpitTypeString(COCKPIT_TRIPOD_INDUSTRIAL) + " (Adv. FCS)";
+                case COCKPIT_SUPERHEAVY_TRIPOD:
+                    return Mech.getCockpitTypeString(COCKPIT_SUPERHEAVY_TRIPOD_INDUSTRIAL) + " (Adv. FCS)";
             }
         }
-        return Mech.getCockpitTypeString(getCockpitType());
+        return Mech.getCockpitTypeString(cockpitType);
+    }
+
+    public String getCockpitTypeString() {
+        return getCockpitTypeString(getCockpitType(), isIndustrial());
     }
 
     public static String getGyroTypeString(int inGyroType) {
@@ -4072,6 +4109,12 @@ public abstract class Mech extends Entity {
             case COCKPIT_SMALL_COMMAND_CONSOLE:
                 inName = "COCKPIT_SMALL_COMMAND_CONSOLE";
                 break;
+            case COCKPIT_TRIPOD_INDUSTRIAL:
+                inName = "COCKPIT_TRIPOD_INDUSTRIAL";
+                break;
+            case COCKPIT_SUPERHEAVY_TRIPOD_INDUSTRIAL:
+                inName = "COCKPIT_SUPERHEAVY_TRIPOD_INDUSTRIAL";
+                break;
             default:
                 inName = "COCKPIT_UNKNOWN";
         }
@@ -4080,6 +4123,14 @@ public abstract class Mech extends Entity {
             return result;
         }
         return inName;
+    }
+
+    public boolean hasAdvancedFireControl() {
+        return (cockpitType != COCKPIT_INDUSTRIAL)
+                && (cockpitType != COCKPIT_PRIMITIVE_INDUSTRIAL)
+                && (cockpitType != COCKPIT_SUPERHEAVY_INDUSTRIAL)
+                && (cockpitType != COCKPIT_TRIPOD_INDUSTRIAL)
+                && (cockpitType != COCKPIT_SUPERHEAVY_TRIPOD_INDUSTRIAL);
     }
 
     @Override
@@ -4308,7 +4359,7 @@ public abstract class Mech extends Entity {
         sb.append(newLine);
 
         sb.append(MtfFile.HEAT_SINKS).append(heatSinks()).append(" ");
-        Optional<EquipmentType> heatSink = getMisc().stream()
+        Optional<MiscType> heatSink = getMisc().stream()
                 .filter(m -> m.getType().hasFlag(MiscType.F_HEAT_SINK)
                     || m.getType().hasFlag(MiscType.F_DOUBLE_HEAT_SINK))
                 .map(Mounted::getType).findFirst();
@@ -4441,12 +4492,6 @@ public abstract class Mech extends Entity {
             sb.append(newLine);
         }
 
-        if (!getFluff().getMMLImagePath().isBlank()) {
-            sb.append(MtfFile.IMAGE_FILE);
-            sb.append(getFluff().getMMLImagePath());
-            sb.append(newLine);
-        }
-
         for (EntityFluff.System system : EntityFluff.System.values()) {
             if (!getFluff().getSystemManufacturer(system).isBlank()) {
                 sb.append(MtfFile.SYSTEM_MANUFACTURER);
@@ -4466,6 +4511,20 @@ public abstract class Mech extends Entity {
         if (getUseManualBV()) {
             sb.append(MtfFile.BV);
             sb.append(getManualBV());
+            sb.append(newLine);
+        }
+
+        if (!icon.isEmpty()) {
+            sb.append(newLine);
+            sb.append(MtfFile.ICON);
+            sb.append(icon.getBase64String());
+            sb.append(newLine);
+        }
+
+        if (getFluff().hasEmbeddedFluffImage()) {
+            sb.append(newLine);
+            sb.append(MtfFile.FLUFF_IMAGE);
+            sb.append(getFluff().getBase64FluffImage().getBase64String());
             sb.append(newLine);
         }
 
@@ -4564,16 +4623,16 @@ public abstract class Mech extends Entity {
                 SYSTEM_LIFE_SUPPORT));
         if (isSuperHeavy()) {
             if (this instanceof TripodMech) {
-            setCockpitType(COCKPIT_SUPERHEAVY_TRIPOD);
+                setCockpitType(isIndustrial() ? COCKPIT_SUPERHEAVY_TRIPOD_INDUSTRIAL : COCKPIT_SUPERHEAVY_TRIPOD);
             } else if (isIndustrial()) {
                 setCockpitType(COCKPIT_SUPERHEAVY_INDUSTRIAL);
             } else {
                 setCockpitType(COCKPIT_SUPERHEAVY);
             }
         } else if (this instanceof TripodMech) {
-            setCockpitType(COCKPIT_TRIPOD);
+            setCockpitType(isIndustrial() ? COCKPIT_TRIPOD_INDUSTRIAL : COCKPIT_TRIPOD);
         } else {
-            setCockpitType(COCKPIT_STANDARD);
+            setCockpitType(isIndustrial() ? COCKPIT_INDUSTRIAL : COCKPIT_STANDARD);
         }
 
         return true;
@@ -5212,12 +5271,10 @@ public abstract class Mech extends Entity {
                 continue;
             }
 
-            Mounted m = cs.getMount();
-
-            EquipmentType type = m.getType();
-            if ((type instanceof MiscType) && ((MiscType) type).isShield()) {
-                rate -= m.getDamageAbsorption(this, m.getLocation());
-                m.damageTaken++;
+            Mounted<?> m = cs.getMount();
+            if ((m instanceof MiscMounted) && ((MiscMounted) m).getType().isShield()) {
+                rate -= ((MiscMounted) m).getDamageAbsorption(this, m.getLocation());
+                ((MiscMounted) m).takeDamage(1);
                 return Math.max(0, rate);
             }
         }
@@ -6370,12 +6427,17 @@ public abstract class Mech extends Entity {
     }
 
     @Override
+    public int getGenericBattleValue() {
+        return (int) Math.round(Math.exp(3.729 + 0.889*Math.log(getWeight())));
+    }
+
+    @Override
     public boolean getsAutoExternalSearchlight() {
         return true;
     }
 
     public static Map<Integer, String> getAllCockpitCodeName() {
-        Map<Integer, String> result = new HashMap();
+        Map<Integer, String> result = new HashMap<>();
 
         result.put(COCKPIT_STANDARD, getCockpitDisplayString(COCKPIT_STANDARD));
         result.put(COCKPIT_SMALL, getCockpitDisplayString(COCKPIT_SMALL));
@@ -6394,6 +6456,8 @@ public abstract class Mech extends Entity {
         result.put(COCKPIT_SUPERHEAVY_INDUSTRIAL, getCockpitDisplayString(COCKPIT_SUPERHEAVY_INDUSTRIAL));
         result.put(COCKPIT_SUPERHEAVY_COMMAND_CONSOLE, getCockpitDisplayString(COCKPIT_SUPERHEAVY_COMMAND_CONSOLE));
         result.put(COCKPIT_SMALL_COMMAND_CONSOLE, getCockpitDisplayString(COCKPIT_SMALL_COMMAND_CONSOLE));
+        result.put(COCKPIT_TRIPOD_INDUSTRIAL, getCockpitDisplayString(COCKPIT_TRIPOD_INDUSTRIAL));
+        result.put(COCKPIT_SUPERHEAVY_TRIPOD_INDUSTRIAL, getCockpitDisplayString(COCKPIT_SUPERHEAVY_TRIPOD_INDUSTRIAL));
         result.put(COCKPIT_UNKNOWN, getCockpitDisplayString(COCKPIT_UNKNOWN));
 
         return result;

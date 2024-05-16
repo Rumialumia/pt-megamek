@@ -23,11 +23,8 @@ import megamek.common.Building.DemolitionCharge;
 import megamek.common.actions.*;
 import megamek.common.annotations.Nullable;
 import megamek.common.containers.PlayerIDandList;
-import megamek.common.enums.BasementType;
-import megamek.common.enums.GamePhase;
-import megamek.common.enums.WeaponSortOrder;
-import megamek.common.equipment.ArmorType;
-import megamek.common.event.GameListener;
+import megamek.common.enums.*;
+import megamek.common.equipment.*;
 import megamek.common.event.GameVictoryEvent;
 import megamek.common.force.Force;
 import megamek.common.force.Forces;
@@ -37,14 +34,16 @@ import megamek.common.options.GameOptions;
 import megamek.common.options.IBasicOption;
 import megamek.common.options.IOption;
 import megamek.common.options.OptionsConstants;
+import megamek.common.planetaryconditions.Atmosphere;
+import megamek.common.planetaryconditions.PlanetaryConditions;
+import megamek.common.planetaryconditions.Wind;
 import megamek.common.preference.PreferenceManager;
-import megamek.common.util.BoardUtilities;
-import megamek.common.util.EmailService;
-import megamek.common.util.SerializationHelper;
-import megamek.common.util.StringUtil;
+import megamek.common.service.AutosaveService;
+import megamek.common.util.*;
 import megamek.common.util.fileUtils.MegaMekFile;
 import megamek.common.verifier.*;
 import megamek.common.weapons.*;
+import megamek.common.weapons.bayweapons.BayWeapon;
 import megamek.common.weapons.infantry.InfantryWeapon;
 import megamek.server.commands.*;
 import megamek.server.victory.VictoryResult;
@@ -63,7 +62,7 @@ import java.util.zip.GZIPOutputStream;
 /**
  * Manages the Game and processes player actions.
  */
-public class GameManager implements IGameManager {
+public class GameManager extends AbstractGameManager {
     private static class EntityTargetPair {
         Entity ent;
 
@@ -140,6 +139,8 @@ public class GameManager implements IGameManager {
      * Keeps track of which player made a request to become Game Master.
      */
     private Player playerRequestingGameMaster = null;
+
+    private AutosaveService asService = new AutosaveService();
 
     /**
      * Special packet queue for client feedback requests.
@@ -595,14 +596,6 @@ public class GameManager implements IGameManager {
         }
     }
 
-    public void send(Packet p) {
-        Server.getServerInstance().send(p);
-    }
-
-    public void send(int connId, Packet p) {
-        Server.getServerInstance().send(connId, p);
-    }
-
     public void transmitPlayerUpdate(Player p) {
         Server.getServerInstance().transmitPlayerUpdate(p);
     }
@@ -638,8 +631,8 @@ public class GameManager implements IGameManager {
      */
     @Override
     public void sendCurrentInfo(int connId) {
-        send(connId, createGameSettingsPacket());
-        send(connId, createPlanetaryConditionsPacket());
+        send(connId, packetHelper.createGameSettingsPacket());
+        send(connId, packetHelper.createPlanetaryConditionsPacket());
 
         Player player = getGame().getPlayer(connId);
         if (null != player) {
@@ -649,15 +642,15 @@ public class GameManager implements IGameManager {
                 send(connId, createMapSettingsPacket());
                 send(createMapSizesPacket());
                 // Send Entities *after* the Lounge Phase Change
-                send(connId, new Packet(PacketCommand.PHASE_CHANGE, getGame().getPhase()));
+                send(connId, packetHelper.createPhaseChangePacket());
                 if (doBlind()) {
                     send(connId, createFilteredFullEntitiesPacket(player, null));
                 } else {
                     send(connId, createFullEntitiesPacket());
                 }
             } else {
-                send(connId, new Packet(PacketCommand.ROUND_UPDATE, getGame().getRoundCount()));
-                send(connId, createBoardPacket());
+                send(connId, packetHelper.createCurrentRoundNumberPacket());
+                send(connId, packetHelper.createBoardsPacket());
                 send(connId, createAllReportsPacket(player));
 
                 // Send entities *before* other phase changes.
@@ -668,22 +661,22 @@ public class GameManager implements IGameManager {
                 }
 
                 setPlayerDone(player, getGame().getEntitiesOwnedBy(player) <= 0);
-                send(connId, new Packet(PacketCommand.PHASE_CHANGE, getGame().getPhase()));
+                send(connId, packetHelper.createPhaseChangePacket());
             }
 
             // LOUNGE triggers a Game.reset() on the client, which wipes out
             // the PlanetaryCondition, so resend
             if (game.getPhase().isLounge()) {
-                send(connId, createPlanetaryConditionsPacket());
+                send(connId, packetHelper.createPlanetaryConditionsPacket());
             }
 
             if (game.getPhase().isFiring() || game.getPhase().isTargeting()
                     || game.getPhase().isOffboard() || game.getPhase().isPhysical()) {
                 // can't go above, need board to have been sent
-                send(connId, createAttackPacket(getGame().getActionsVector(), 0));
-                send(connId, createAttackPacket(getGame().getChargesVector(), 1));
-                send(connId, createAttackPacket(getGame().getRamsVector(), 1));
-                send(connId, createAttackPacket(getGame().getTeleMissileAttacksVector(), 1));
+                send(connId, packetHelper.createAttackPacket(getGame().getActionsVector(), false));
+                send(connId, packetHelper.createAttackPacket(getGame().getChargesVector(), true));
+                send(connId, packetHelper.createAttackPacket(getGame().getRamsVector(), true));
+                send(connId, packetHelper.createAttackPacket(getGame().getTeleMissileAttacksVector(), true));
             }
 
             if (getGame().getPhase().hasTurns() && getGame().hasMoreTurns()) {
@@ -721,13 +714,9 @@ public class GameManager implements IGameManager {
 
     @Override
     public void handlePacket(int connId, Packet packet) {
+        super.handlePacket(connId, packet);
         final Player player = game.getPlayer(connId);
         switch (packet.getCommand()) {
-            case PLAYER_READY:
-                receivePlayerDone(packet, connId);
-                send(createPlayerDonePacket(connId));
-                checkReady();
-                break;
             case PRINCESS_SETTINGS:
                 if (player != null) {
                     if (game.getBotSettings() == null) {
@@ -869,7 +858,7 @@ public class GameManager implements IGameManager {
             case SENDING_GAME_SETTINGS:
                 if (receiveGameOptions(packet, connId)) {
                     resetPlayersDone();
-                    send(createGameSettingsPacket());
+                    send(packetHelper.createGameSettingsPacket());
                     receiveGameOptionsAux(packet, connId);
                 }
                 break;
@@ -909,7 +898,7 @@ public class GameManager implements IGameManager {
                     sendServerChat(player + " changed planetary conditions");
                     game.setPlanetaryConditions(conditions);
                     resetPlayersDone();
-                    send(createPlanetaryConditionsPacket());
+                    send(packetHelper.createPlanetaryConditionsPacket());
                 }
                 break;
             case UNLOAD_STRANDED:
@@ -1081,8 +1070,9 @@ public class GameManager implements IGameManager {
             // reset spotlights
             // If deployment phase, set Searchlight state based on startSearchLightsOn;
             if (phase.isDeployment()) {
+                PlanetaryConditions conditions = game.getPlanetaryConditions();
                 boolean startSLOn = PreferenceManager.getClientPreferences().getStartSearchlightsOn()
-                        && game.getPlanetaryConditions().isIlluminationEffective();
+                        && conditions.getLight().isDuskOrFullMoonOrMoonlessOrPitchBack();
                 entity.setSearchlightState(startSLOn);
                 entity.setIlluminated(startSLOn);
             }
@@ -1360,11 +1350,8 @@ public class GameManager implements IGameManager {
         }
     }
 
-    /**
-     * Called when a player declares that he is "done." Checks to see if all
-     * players are done, and if so, moves on to the next phase.
-     */
-    private void checkReady() {
+    @Override
+    protected void checkReady() {
         // check if all active players are done
         for (Player player : game.getPlayersList()) {
             if (!player.isGhost() && !player.isObserver() && !player.isDone()) {
@@ -1384,9 +1371,7 @@ public class GameManager implements IGameManager {
             return; // don't end the phase yet, players need to see new report
         }
 
-        // need at least one entity in the game for the lounge phase to end
-        if (!getGame().getPhase().hasTurns()
-                && (!getGame().getPhase().isLounge() || (getGame().getNoOfEntities() > 0))) {
+        if (!getGame().getPhase().hasTurns() && !isEmptyLobby()) {
             endCurrentPhase();
         }
     }
@@ -1592,7 +1577,8 @@ public class GameManager implements IGameManager {
      *
      * @param phase the <code>int</code> id of the phase to change to
      */
-    private void changePhase(GamePhase phase) {
+    @Override
+    protected void changePhase(GamePhase phase) {
         game.setLastPhase(game.getPhase());
         game.setPhase(phase);
 
@@ -1601,7 +1587,7 @@ public class GameManager implements IGameManager {
 
         if (phase.isPlayable(getGame())) {
             // tell the players about the new phase
-            send(new Packet(PacketCommand.PHASE_CHANGE, phase));
+            send(packetHelper.createPhaseChangePacket());
 
             // post phase change stuff
             executePhase(phase);
@@ -1894,6 +1880,7 @@ public class GameManager implements IGameManager {
 
                 if (!game.shouldDeployThisRound()) {
                     incrementAndSendGameRound();
+                    asService.performRollingAutosave(this);
                 }
 
                 // setIneligible(phase);
@@ -2010,8 +1997,8 @@ public class GameManager implements IGameManager {
                 resetEntityPhase(phase);
                 clearReports();
                 resolveHeat();
-                if (game.getPlanetaryConditions().isSandBlowing()
-                        && (game.getPlanetaryConditions().getWindStrength() > PlanetaryConditions.WI_LIGHT_GALE)) {
+                PlanetaryConditions conditions = game.getPlanetaryConditions();
+                if (conditions.isBlowingSandActive()) {
                     addReport(resolveBlowingSandDamage());
                 }
                 addReport(resolveControlRolls());
@@ -2024,7 +2011,7 @@ public class GameManager implements IGameManager {
                 resolveEmergencyCoolantSystem();
                 checkForSuffocation();
                 game.getPlanetaryConditions().determineWind();
-                send(createPlanetaryConditionsPacket());
+                send(packetHelper.createPlanetaryConditionsPacket());
 
                 applyBuildingDamage();
                 addReport(game.ageFlares());
@@ -2159,9 +2146,9 @@ public class GameManager implements IGameManager {
                 game.setupTeams();
                 applyBoardSettings();
                 game.getPlanetaryConditions().determineWind();
-                send(createPlanetaryConditionsPacket());
+                send(packetHelper.createPlanetaryConditionsPacket());
                 // transmit the board to everybody
-                send(createBoardPacket());
+                send(packetHelper.createBoardsPacket());
                 game.setupRoundDeployment();
                 game.setVictoryContext(new HashMap<>());
                 game.createVictoryConditions();
@@ -2194,6 +2181,7 @@ public class GameManager implements IGameManager {
      * Calculates the initial count and BV for all players, and thus should only be called at the
      * start of a game
      */
+    @Override
     public void calculatePlayerInitialCounts() {
         for (final Enumeration<Player> players = game.getPlayers(); players.hasMoreElements(); ) {
             final Player player = players.nextElement();
@@ -2303,7 +2291,8 @@ public class GameManager implements IGameManager {
     /**
      * Ends this phase and moves on to the next.
      */
-    private void endCurrentPhase() {
+    @Override
+    protected void endCurrentPhase() {
         switch (game.getPhase()) {
             case LOUNGE:
                 game.addReports(vPhaseReport);
@@ -2607,7 +2596,7 @@ public class GameManager implements IGameManager {
      */
     private void incrementAndSendGameRound() {
         game.incrementRoundCount();
-        send(new Packet(PacketCommand.ROUND_UPDATE, getGame().getRoundCount()));
+        send(packetHelper.createCurrentRoundNumberPacket());
     }
 
     /**
@@ -2913,7 +2902,7 @@ public class GameManager implements IGameManager {
         }
         if (game.getPlanetaryConditions().isTerrainAffected()) {
             BoardUtilities.addWeatherConditions(newBoard, game.getPlanetaryConditions().getWeather(),
-                    game.getPlanetaryConditions().getWindStrength());
+                    game.getPlanetaryConditions().getWind());
         }
         game.setBoard(newBoard);
     }
@@ -3166,7 +3155,7 @@ public class GameManager implements IGameManager {
                             player.incrementOtherTurns();
                         }
                     }
-                } else if ((entity instanceof Tank) && tankMoveByLance) {
+                } else if ((entity instanceof Tank) && !(entity instanceof GunEmplacement) && tankMoveByLance) {
                     player.incrementMultiTurns(GameTurn.CLASS_TANK);
                 } else if ((entity instanceof Mech) && mekMoveByLance) {
                     player.incrementMultiTurns(GameTurn.CLASS_MECH);
@@ -3485,19 +3474,20 @@ public class GameManager implements IGameManager {
             // we don't much care about wind direction and such in a hard vacuum
             if (!game.getBoard().inSpace()) {
                 // Wind direction and strength
+                PlanetaryConditions conditions = game.getPlanetaryConditions();
                 Report rWindDir = new Report(1025, Report.PUBLIC);
-                rWindDir.add(game.getPlanetaryConditions().getWindDirDisplayableName());
+                rWindDir.add(conditions.getWindDirection().toString());
                 rWindDir.newlines = 0;
                 Report rWindStr = new Report(1030, Report.PUBLIC);
-                rWindStr.add(game.getPlanetaryConditions().getWindDisplayableName());
+                rWindStr.add(conditions.getWind().toString());
                 rWindStr.newlines = 0;
                 Report rWeather = new Report(1031, Report.PUBLIC);
-                rWeather.add(game.getPlanetaryConditions().getWeatherDisplayableName());
+                rWeather.add(conditions.getWeather().toString());
                 rWeather.newlines = 0;
                 Report rLight = new Report(1032, Report.PUBLIC);
-                rLight.add(game.getPlanetaryConditions().getLightDisplayableName());
+                rLight.add(conditions.getLight().toString());
                 Report rVis = new Report(1033, Report.PUBLIC);
-                rVis.add(game.getPlanetaryConditions().getFogDisplayableName());
+                rVis.add(conditions.getFog().toString());
                 addReport(rWindDir);
                 addReport(rWindStr);
                 addReport(rWeather);
@@ -7938,7 +7928,7 @@ public class GameManager implements IGameManager {
             int minTemp = -30;
             boolean useBlackIce = game.getOptions().booleanOption(OptionsConstants.ADVANCED_BLACK_ICE);
             boolean goodTemp = game.getPlanetaryConditions().getTemperature() <= minTemp;
-            boolean goodWeather = game.getPlanetaryConditions().getWeather() == PlanetaryConditions.WE_ICE_STORM;
+            boolean goodWeather = game.getPlanetaryConditions().getWeather().isIceStorm();
             if (isPavementStep && ((useBlackIce && goodTemp) || goodWeather)) {
                 if (!curHex.containsTerrain(Terrains.BLACK_ICE)) {
                     int blackIceChance = Compute.d6(1);
@@ -8838,7 +8828,7 @@ public class GameManager implements IGameManager {
             // check for black ice
             boolean useBlackIce = game.getOptions().booleanOption(OptionsConstants.ADVANCED_BLACK_ICE);
             boolean goodTemp = game.getPlanetaryConditions().getTemperature() <= PlanetaryConditions.BLACK_ICE_TEMP;
-            boolean goodWeather = game.getPlanetaryConditions().getWeather() == PlanetaryConditions.WE_ICE_STORM;
+            boolean goodWeather = game.getPlanetaryConditions().getWeather().isIceStorm();
             if ((useBlackIce && goodTemp) || goodWeather) {
                 if (ServerHelper.checkEnteringBlackIce(this, curPos, curHex, useBlackIce, goodTemp, goodWeather)) {
                     rollTarget = entity.checkLandingOnBlackIce(overallMoveType, curHex);
@@ -9272,12 +9262,12 @@ public class GameManager implements IGameManager {
 
         // if we generated a charge attack, report it now
         if (charge != null) {
-            send(createAttackPacket(charge, 1));
+            send(packetHelper.createChargeAttackPacket(charge));
         }
 
         // if we generated a ram attack, report it now
         if (ram != null) {
-            send(createAttackPacket(ram, 1));
+            send(packetHelper.createChargeAttackPacket(ram));
         }
         if ((entity instanceof Mech) && entity.hasEngine() && ((Mech) entity).isIndustrial()
                 && !entity.hasEnvironmentalSealing()
@@ -11694,6 +11684,8 @@ public class GameManager implements IGameManager {
     public Vector<Report> doSetLocationsExposure(Entity entity, Hex hex,
                                                  boolean isJump, int elevation) {
         Vector<Report> vPhaseReport = new Vector<>();
+        PlanetaryConditions conditions = game.getPlanetaryConditions();
+        boolean aeroSpaceborne = (entity.getEntityType() & Entity.ETYPE_AERO) == 0 && entity.isSpaceborne();
         if (hex == null) {
             return vPhaseReport;
         }
@@ -11706,8 +11698,8 @@ public class GameManager implements IGameManager {
             if ((entity instanceof Mech) && !entity.isProne()
                     && (hex.terrainLevel(Terrains.WATER) <= partialWaterLevel)) {
                 for (int loop = 0; loop < entity.locations(); loop++) {
-                    if (game.getPlanetaryConditions().isVacuum()
-                            || ((entity.getEntityType() & Entity.ETYPE_AERO) == 0 && entity.isSpaceborne())) {
+                    if (conditions.getAtmosphere().isLighterThan(Atmosphere.THIN)
+                            || aeroSpaceborne) {
                         entity.setLocationStatus(loop, ILocationExposureStatus.VACUUM);
                     } else {
                         entity.setLocationStatus(loop, ILocationExposureStatus.NORMAL);
@@ -11730,8 +11722,7 @@ public class GameManager implements IGameManager {
             } else {
                 int status = ILocationExposureStatus.WET;
                 if (entity.relHeight() >= 0) {
-                    status = game.getPlanetaryConditions().isVacuum() ?
-                            ILocationExposureStatus.VACUUM : ILocationExposureStatus.NORMAL;
+                    status = conditions.getAtmosphere().isLighterThan(Atmosphere.THIN) ? ILocationExposureStatus.VACUUM : ILocationExposureStatus.NORMAL;
                 }
                 for (int loop = 0; loop < entity.locations(); loop++) {
                     entity.setLocationStatus(loop, status);
@@ -11742,8 +11733,8 @@ public class GameManager implements IGameManager {
             }
         } else {
             for (int loop = 0; loop < entity.locations(); loop++) {
-                if (game.getPlanetaryConditions().isVacuum()
-                        || ((entity.getEntityType() & Entity.ETYPE_AERO) == 0 && entity.isSpaceborne())) {
+                if (conditions.getAtmosphere().isLighterThan(Atmosphere.THIN)
+                        || aeroSpaceborne) {
                     entity.setLocationStatus(loop, ILocationExposureStatus.VACUUM);
                 } else {
                     entity.setLocationStatus(loop, ILocationExposureStatus.NORMAL);
@@ -12976,7 +12967,8 @@ public class GameManager implements IGameManager {
                 // all spheroid craft should have velocity of zero in atmosphere
                 // regardless of what was entered
                 IAero a = (IAero) entity;
-                if (a.isSpheroid() || game.getPlanetaryConditions().isVacuum()) {
+                if (a.isSpheroid()
+                        || game.getPlanetaryConditions().getAtmosphere().isLighterThan(Atmosphere.THIN)) {
                     a.setCurrentVelocity(0);
                     a.setNextVelocity(0);
                 }
@@ -13435,7 +13427,7 @@ public class GameManager implements IGameManager {
         }
         entityUpdate(entity.getId());
 
-        Packet p = createAttackPacket(vector, 0);
+        Packet p = packetHelper.createAttackPacket(vector, false);
         if (getGame().getPhase().isSimultaneous(getGame())) {
             // Update attack only to player who declared it & observers
             for (Player player : game.getPlayersVector()) {
@@ -13474,11 +13466,11 @@ public class GameManager implements IGameManager {
      */
     public void assignAMS() {
         // Get all of the coords that would be protected by APDS
-        Hashtable<Coords, List<Mounted>> apdsCoords = getAPDSProtectedCoords();
+        Hashtable<Coords, List<WeaponMounted>> apdsCoords = getAPDSProtectedCoords();
         // Map target to a list of missile attacks directed at it
         Hashtable<Entity, Vector<WeaponHandler>> htAttacks = new Hashtable<>();
         // Keep track of each APDS, and which attacks it could affect
-        Hashtable<Mounted, Vector<WeaponHandler>> apdsTargets = new Hashtable<>();
+        Hashtable<WeaponMounted, Vector<WeaponHandler>> apdsTargets = new Hashtable<>();
 
         for (AttackHandler ah : game.getAttacksVector()) {
             WeaponHandler wh = (WeaponHandler) ah;
@@ -13545,7 +13537,7 @@ public class GameManager implements IGameManager {
             v.addElement(wh);
             // Keep track of what weapon attacks could be affected by APDS
             if (apdsCoords.containsKey(target.getPosition())) {
-                for (Mounted apds : apdsCoords.get(target.getPosition())) {
+                for (WeaponMounted apds : apdsCoords.get(target.getPosition())) {
                     // APDS only affects attacks against friendly units
                     if (target.isEnemyOf(apds.getEntity())) {
                         continue;
@@ -13569,7 +13561,7 @@ public class GameManager implements IGameManager {
 
         // Let each APDS assign itself to an attack
         Set<WeaponAttackAction> targetedAttacks = new HashSet<>();
-        for (Mounted apds : apdsTargets.keySet()) {
+        for (WeaponMounted apds : apdsTargets.keySet()) {
             List<WeaponHandler> potentialTargets = apdsTargets.get(apds);
             // Ensure we only target each attack once
             List<WeaponHandler> targetsToRemove = new ArrayList<>();
@@ -13602,7 +13594,7 @@ public class GameManager implements IGameManager {
      * @param vAttacks
      *            List of missile attacks directed at e
      */
-    private WeaponAttackAction manuallyAssignAPDSTarget(Mounted apds,
+    private WeaponAttackAction manuallyAssignAPDSTarget(WeaponMounted apds,
                                                         List<WeaponHandler> vAttacks) {
         Entity e = apds.getEntity();
         if (e == null) {
@@ -13689,7 +13681,7 @@ public class GameManager implements IGameManager {
         // Current AMS targets: each attack can only be targeted once
         HashSet<WeaponAttackAction> amsTargets = new HashSet<>();
         // Pick assignment for each active AMS
-        for (Mounted ams : e.getActiveAMS()) {
+        for (WeaponMounted ams : e.getActiveAMS()) {
             // Skip APDS
             if (ams.isAPDS()) {
                 continue;
@@ -13754,22 +13746,22 @@ public class GameManager implements IGameManager {
      *
      * @return
      */
-    private Hashtable<Coords, List<Mounted>> getAPDSProtectedCoords() {
+    private Hashtable<Coords, List<WeaponMounted>> getAPDSProtectedCoords() {
         // Get all of the coords that would be protected by APDS
-        Hashtable<Coords, List<Mounted>> apdsCoords = new Hashtable<>();
+        Hashtable<Coords, List<WeaponMounted>> apdsCoords = new Hashtable<>();
         for (Entity e : game.getEntitiesVector()) {
             // Ignore Entities without positions
             if (e.getPosition() == null) {
                 continue;
             }
             Coords origPos = e.getPosition();
-            for (Mounted ams : e.getActiveAMS()) {
+            for (WeaponMounted ams : e.getActiveAMS()) {
                 // Ignore non-APDS AMS
                 if (!ams.isAPDS()) {
                     continue;
                 }
                 // Add the current hex as a defended location
-                List<Mounted> apdsList = apdsCoords.computeIfAbsent(origPos, k -> new ArrayList<>());
+                List<WeaponMounted> apdsList = apdsCoords.computeIfAbsent(origPos, k -> new ArrayList<>());
                 apdsList.add(ams);
                 // Add each coords that is within arc/range as protected
                 int maxDist = 3;
@@ -14680,7 +14672,7 @@ public class GameManager implements IGameManager {
         }
 
         // no lighting fires in tornadoes
-        if (game.getPlanetaryConditions().getWindStrength() > PlanetaryConditions.WI_STORM) {
+        if (game.getPlanetaryConditions().getWind().isStrongerThan(Wind.STORM)) {
             nTargetRoll = new TargetRoll(TargetRoll.AUTOMATIC_FAIL, "tornado");
         }
 
@@ -20282,12 +20274,17 @@ public class GameManager implements IGameManager {
                 continue;
             }
             final Hex curHex = game.getBoard().getHex(entity.getPosition());
-            if ((((entity.getElevation() < 0) && ((curHex
-                    .terrainLevel(Terrains.WATER) > 1) || ((curHex
-                    .terrainLevel(Terrains.WATER) == 1) && entity.isProne()))) || game
-                    .getPlanetaryConditions().isVacuum())
-                    && (entity.getHitCriticals(CriticalSlot.TYPE_SYSTEM,
-                    Mech.SYSTEM_LIFE_SUPPORT, Mech.LOC_HEAD) > 0)) {
+
+            boolean depthOneProne = (curHex.terrainLevel(Terrains.WATER) == 1)
+                    && entity.isProne();
+            boolean inWater = (curHex.terrainLevel(Terrains.WATER) > 1)
+                    || depthOneProne;
+            boolean underWater = (entity.getElevation() < 0)
+                    && inWater;
+            boolean canNotBeathe = underWater
+                    || game.getPlanetaryConditions().getAtmosphere().isLighterThan(Atmosphere.THIN);
+            if (canNotBeathe
+                    && (entity.getHitCriticals(CriticalSlot.TYPE_SYSTEM, Mech.SYSTEM_LIFE_SUPPORT, Mech.LOC_HEAD) > 0)) {
                 Report r = new Report(6020);
                 r.subject = entity.getId();
                 r.addDesc(entity);
@@ -21806,8 +21803,11 @@ public class GameManager implements IGameManager {
         }
 
         // Is the infantry in vacuum?
-        if ((isPlatoon || isBattleArmor) && !te.isDestroyed() && !te.isDoomed()
-                && game.getPlanetaryConditions().isVacuum()) {
+        boolean platoonOrBattleArmor = isPlatoon || isBattleArmor;
+        if (platoonOrBattleArmor
+                && !te.isDestroyed()
+                && !te.isDoomed()
+                && game.getPlanetaryConditions().getAtmosphere().isLighterThan(Atmosphere.THIN)) {
             // PBI. Double damage.
             damage *= 2;
             r = new Report(6041);
@@ -22631,14 +22631,10 @@ public class GameManager implements IGameManager {
 
                     // divide damage in half
                     // do not divide by half if it is an ammo explosion
+                    // Minimum SI damage is now 1 (per errata: https://bg.battletech.com/forums/index.php?topic=81913.0 )
                     if (!ammoExplosion && !nukeS2S
                             && !game.getOptions().booleanOption(OptionsConstants.ADVAERORULES_AERO_SANITY)) {
-                        damage /= 2;
-                    }
-
-                    // this should result in a crit
-                    // but only if it really did damage after rounding down
-                    if (damage > 0) {
+                        damage = (int) Math.round(damage / 2.0);
                         critSI = true;
                     }
 
@@ -23080,7 +23076,7 @@ public class GameManager implements IGameManager {
 
                         // If there are split weapons in this location, mark it
                         // as hit, even if it took no criticals.
-                        for (Mounted m : te.getWeaponList()) {
+                        for (WeaponMounted m : te.getWeaponList()) {
                             if (m.isSplit()) {
                                 if ((m.getLocation() == hit.getLocation())
                                         || (m.getLocation() == nextHit
@@ -25137,12 +25133,13 @@ public class GameManager implements IGameManager {
                     }
                 }
             case Aero.CRIT_WEAPON:
-                if (aero.isCapitalFighter()) {
-                    FighterSquadron cf = (FighterSquadron) aero;
+                FighterSquadron cf = (FighterSquadron) game.getEntity(aero.getTransportId());
+                if (aero.isCapitalFighter() && cf != null) {
+                    // The Squadron should be set as the "transport" of the Squadron members, but may be null
                     boolean destroyAll = false;
                     // CRIT_WEAPON damages the capital fighter/squadron's weapon groups
-                    // Go ahead and map damage for the fighter's weapon criticals for MHQ
-                    // resolution.
+                    // TODO: Go ahead and map damage for the fighters' weapon criticals for MHQ resolution.
+                    // (Currently this is not working as the Capital Fighter has no weapons of its own, only groups.
                     cf.damageCapFighterWeapons(loc);
                     if ((loc == Aero.LOC_NOSE) || (loc == Aero.LOC_AFT)) {
                         destroyAll = true;
@@ -25160,7 +25157,7 @@ public class GameManager implements IGameManager {
                             cf.setWingsHit(true);
                         }
                     }
-                    for (Mounted weapon : cf.getWeaponList()) {
+                    for (WeaponMounted weapon : cf.getWeaponList()) {
                         if (weapon.getLocation() == loc) {
                             if (destroyAll) {
                                 weapon.setHit(true);
@@ -25170,7 +25167,7 @@ public class GameManager implements IGameManager {
                         }
                     }
                     // also destroy any ECM or BAP in the location hit
-                    for (Mounted misc : cf.getMisc()) {
+                    for (MiscMounted misc : cf.getMisc()) {
                         if ((misc.getType().hasFlag(MiscType.F_ECM)
                                 || misc.getType().hasFlag(MiscType.F_ANGEL_ECM)
                                 || misc.getType().hasFlag(MiscType.F_BAP))
@@ -25201,40 +25198,39 @@ public class GameManager implements IGameManager {
                 }
                 r = new Report(9150);
                 r.subject = aero.getId();
-                List<Mounted> weapons = new ArrayList<>();
+                List<Mounted<?>> hittable = new ArrayList<>();
                 // Ignore internal bomb bay-mounted weapons
-                for (Mounted weapon : aero.getWeaponList()) {
+                for (WeaponMounted weapon : aero.getWeaponList()) {
                     if ((weapon.getLocation() == loc) && !weapon.isDestroyed() && !weapon.isInternalBomb()
                             && weapon.getType().isHittable()) {
-                        weapons.add(weapon);
+                        hittable.add(weapon);
                     }
                 }
                 // add in hittable misc equipment; internal bay munitions are handled separately.
-                for (Mounted misc : aero.getMisc()) {
+                for (MiscMounted misc : aero.getMisc()) {
                     if (misc.getType().isHittable()
                             && (misc.getLocation() == loc)
                             && !misc.isDestroyed()
                             && !misc.isInternalBomb()) {
-                        weapons.add(misc);
+                        hittable.add(misc);
                     }
                 }
 
-                if (!weapons.isEmpty()) {
-                    Mounted weapon = weapons.get(Compute.randomInt(weapons.size()));
+                if (!hittable.isEmpty()) {
+                    Mounted<?> equipmentHit = hittable.get(Compute.randomInt(hittable.size()));
                     // possibly check for an ammo explosion
                     // don't allow ammo explosions on fighter squadrons
                     if (game.getOptions().booleanOption(OptionsConstants.ADVAERORULES_STRATOPS_AMMO_EXPLOSIONS)
                             && !(aero instanceof FighterSquadron)
-                            && (weapon.getType() instanceof WeaponType)) {
+                            && (equipmentHit.getType() instanceof WeaponType)) {
                         //Bay Weapons
-                        if (aero.usesWeaponBays()) {
+                        if ((equipmentHit instanceof WeaponMounted) && aero.usesWeaponBays()) {
                             //Finish reporting(9150) a hit on the bay
-                            r.add(weapon.getName());
+                            r.add(equipmentHit.getName());
                             reports.add(r);
                             //Pick a random weapon in the bay and get the stats
-                            int wId = weapon.getBayWeapons().get(Compute.randomInt(weapon.getBayWeapons().size()));
-                            Mounted bayW = aero.getEquipment(wId);
-                            Mounted bayWAmmo = bayW.getLinked();
+                            WeaponMounted bayW = Compute.randomListElement(((WeaponMounted) equipmentHit).getBayWeapons());
+                            AmmoMounted bayWAmmo = bayW.getLinkedAmmo();
                             if (bayWAmmo != null && bayWAmmo.getType().isExplosive(bayWAmmo)) {
                                 r = new Report(9156);
                                 r.subject = aero.getId();
@@ -25273,33 +25269,30 @@ public class GameManager implements IGameManager {
                                 }
                             }
                             // Hit the weapon then also hit all the other weapons in the bay
-                            weapon.setHit(true);
-                            for (int next : weapon.getBayWeapons()) {
-                                Mounted bayWeap = aero.getEquipment(next);
-                                if (null != bayWeap) {
-                                    bayWeap.setHit(true);
-                                    // Taharqa : We should also damage the critical slot, or MM and
-                                    // MHQ won't remember that this weapon is damaged on the MUL file
-                                    for (int i = 0; i < aero.getNumberOfCriticals(loc); i++) {
-                                        CriticalSlot slot1 = aero.getCritical(loc, i);
-                                        if ((slot1 == null) ||
-                                                (slot1.getType() == CriticalSlot.TYPE_SYSTEM)) {
-                                            continue;
-                                        }
-                                        Mounted mounted = slot1.getMount();
-                                        if (mounted.equals(bayWeap)) {
-                                            aero.hitAllCriticals(loc, i);
-                                            break;
-                                        }
+                            equipmentHit.setHit(true);
+                            for (WeaponMounted bayWeap : ((WeaponMounted) equipmentHit).getBayWeapons()) {
+                                bayWeap.setHit(true);
+                                // Taharqa : We should also damage the critical slot, or MM and
+                                // MHQ won't remember that this weapon is damaged on the MUL file
+                                for (int i = 0; i < aero.getNumberOfCriticals(loc); i++) {
+                                    CriticalSlot slot1 = aero.getCritical(loc, i);
+                                    if ((slot1 == null) ||
+                                            (slot1.getType() == CriticalSlot.TYPE_SYSTEM)) {
+                                        continue;
+                                    }
+                                    Mounted mounted = slot1.getMount();
+                                    if (mounted.equals(bayWeap)) {
+                                        aero.hitAllCriticals(loc, i);
+                                        break;
                                     }
                                 }
                             }
                             break;
                         }
                         // does it use Ammo?
-                        WeaponType wtype = (WeaponType) weapon.getType();
+                        WeaponType wtype = (WeaponType) equipmentHit.getType();
                         if (wtype.getAmmoType() != AmmoType.T_NA) {
-                            Mounted m = weapon.getLinked();
+                            Mounted m = equipmentHit.getLinked();
                             int ammoroll = Compute.d6(2);
                             if (ammoroll >= 10) {
                                 // A chance to reroll an explosion with edge
@@ -25334,24 +25327,24 @@ public class GameManager implements IGameManager {
                     // If the weapon is explosive, use edge to roll up a new one
                     if (aero.getCrew().hasEdgeRemaining()
                             && aero.getCrew().getOptions().booleanOption(OptionsConstants.EDGE_WHEN_AERO_EXPLOSION)
-                            && (weapon.getType().isExplosive(weapon) && !weapon.isHit()
-                            && !weapon.isDestroyed())) {
+                            && (equipmentHit.getType().isExplosive(equipmentHit) && !equipmentHit.isHit()
+                            && !equipmentHit.isDestroyed())) {
                         aero.getCrew().decreaseEdge();
                         // Try something new for an interrupting report. r is still 9150.
                         Report r1 = new Report(6530);
                         r1.subject = aero.getId();
                         r1.add(aero.getCrew().getOptions().intOption(OptionsConstants.EDGE));
                         reports.add(r1);
-                        weapon = weapons.get(Compute.randomInt(weapons.size()));
+                        equipmentHit = hittable.get(Compute.randomInt(hittable.size()));
                     }
-                    r.add(weapon.getName());
+                    r.add(equipmentHit.getName());
                     reports.add(r);
                     // explosive weapons e.g. gauss now explode
-                    if (weapon.getType().isExplosive(weapon) && !weapon.isHit()
-                            && !weapon.isDestroyed()) {
-                        reports.addAll(explodeEquipment(aero, loc, weapon));
+                    if (equipmentHit.getType().isExplosive(equipmentHit) && !equipmentHit.isHit()
+                            && !equipmentHit.isDestroyed()) {
+                        reports.addAll(explodeEquipment(aero, loc, equipmentHit));
                     }
-                    weapon.setHit(true);
+                    equipmentHit.setHit(true);
                     // Taharqa : We should also damage the critical slot, or MM and MHQ won't
                     // remember that this weapon is damaged on the MUL file
                     for (int i = 0; i < aero.getNumberOfCriticals(loc); i++) {
@@ -25359,16 +25352,15 @@ public class GameManager implements IGameManager {
                         if ((slot1 == null) || (slot1.getType() == CriticalSlot.TYPE_SYSTEM)) {
                             continue;
                         }
-                        Mounted mounted = slot1.getMount();
-                        if (mounted.equals(weapon)) {
+                        Mounted<?> mounted = slot1.getMount();
+                        if (mounted.equals(equipmentHit)) {
                             aero.hitAllCriticals(loc, i);
                             break;
                         }
                     }
                     // if this is a weapons bay then also hit all the other weapons
-                    for (int wId : weapon.getBayWeapons()) {
-                        Mounted bayWeap = aero.getEquipment(wId);
-                        if (null != bayWeap) {
+                    if (equipmentHit instanceof WeaponMounted) {
+                        for (WeaponMounted bayWeap : ((WeaponMounted) equipmentHit).getBayWeapons()) {
                             bayWeap.setHit(true);
                             // Taharqa : We should also damage the critical slot, or MM and MHQ
                             // won't remember that this weapon is damaged on the MUL file
@@ -25685,7 +25677,7 @@ public class GameManager implements IGameManager {
                         r.subject = aero.getId();
                         r.addDesc(aero);
                         reports.add(r);
-                        for (Mounted bomb: ((IBomber) aero).getBombs()) {
+                        for (BombMounted bomb: ((IBomber) aero).getBombs()) {
                             damageBomb(bomb);
                         }
                         aero.applyDamage();
@@ -25694,13 +25686,13 @@ public class GameManager implements IGameManager {
                         // This will require firing an event to the End Phase to display a dialog;
                         // for now just randomly dump bombs just like bots'.
                         // TODO: fire event here to display dialog in end phase.
-                        for (Mounted bomb:randomlySubSelectList(((IBomber) aero).getBombs(), bombsDestroyed)) {
+                        for (BombMounted bomb : randomlySubSelectList(((IBomber) aero).getBombs(), bombsDestroyed)) {
                             damageBomb(bomb);
                         }
                         aero.applyDamage();
                     } else {
                         // This should always use the random method.
-                        for (Mounted bomb:randomlySubSelectList(((IBomber) aero).getBombs(), bombsDestroyed)) {
+                        for (BombMounted bomb:randomlySubSelectList(((IBomber) aero).getBombs(), bombsDestroyed)) {
                             damageBomb(bomb);
                         }
                         aero.applyDamage();
@@ -25716,7 +25708,7 @@ public class GameManager implements IGameManager {
         }
     }
 
-    private void damageBomb(Mounted bomb) {
+    private void damageBomb(BombMounted bomb) {
         bomb.setShotsLeft(0);
         bomb.setHit(true);
         if (bomb.getLinked() != null && (bomb.getLinked().getUsableShotsLeft() > 0)) {
@@ -25725,8 +25717,8 @@ public class GameManager implements IGameManager {
     }
 
     // Randomly select subset of Mounted items.
-    private ArrayList<Mounted> randomlySubSelectList(List<Mounted> list, int size) {
-        ArrayList<Mounted> subset = new ArrayList<>();
+    private <T extends Mounted<?>> List<T> randomlySubSelectList(List<T> list, int size) {
+        List<T> subset = new ArrayList<>();
         Random random_method = new Random();
         for (int i = 0; i < size; i++) {
             subset.add(list.get(random_method.nextInt(list.size())));
@@ -27185,10 +27177,11 @@ public class GameManager implements IGameManager {
             int breachroll = 0;
             // set the target roll for the breach
             int target = 10;
+            PlanetaryConditions conditions = game.getPlanetaryConditions();
             // if this is a vacuum check and we are in trace atmosphere then
             // adjust target
             if ((entity.getLocationStatus(loc) == ILocationExposureStatus.VACUUM)
-                    && (game.getPlanetaryConditions().getAtmosphere() == PlanetaryConditions.ATMO_TRACE)) {
+                    && conditions.getAtmosphere().isTrace()) {
                 target = 12;
             }
             // if this is a surface naval vessel and the attack is not from
@@ -28551,7 +28544,7 @@ public class GameManager implements IGameManager {
             }
             // also do DWP dumping
             if (entity instanceof BattleArmor) {
-                for (Mounted m : entity.getWeaponList()) {
+                for (WeaponMounted m : entity.getWeaponList()) {
                     if (m.isDWPMounted() && m.isPendingDump()) {
                         m.setMissing(true);
                         r = new Report(5116);
@@ -28763,7 +28756,7 @@ public class GameManager implements IGameManager {
      */
     public void addSmoke(ArrayList<Coords> coords, int windDir, boolean bInferno) {
         // if a tornado, then no smoke!
-        if (game.getPlanetaryConditions().getWindStrength() > PlanetaryConditions.WI_STORM) {
+        if (game.getPlanetaryConditions().getWind().isStrongerThan(Wind.STORM)) {
             return;
         }
 
@@ -28821,7 +28814,7 @@ public class GameManager implements IGameManager {
      *                  in base path).
      * @param sizes     Where to store the discovered board sizes
      */
-    private void getBoardSizesInDir(final File searchDir, TreeSet<BoardDimensions> sizes) {
+    private static void getBoardSizesInDir(final File searchDir, TreeSet<BoardDimensions> sizes) {
         if (searchDir == null) {
             throw new IllegalArgumentException("must provide searchDir");
         }
@@ -28860,7 +28853,7 @@ public class GameManager implements IGameManager {
      *
      * @return A Set containing all the available board sizes.
      */
-    private Set<BoardDimensions> getBoardSizes() {
+    public static Set<BoardDimensions> getBoardSizes() {
         TreeSet<BoardDimensions> board_sizes = new TreeSet<>();
 
         File boards_dir = Configuration.boardsDir();
@@ -29580,75 +29573,18 @@ public class GameManager implements IGameManager {
 
             // Now we relink C3/NC3/C3i to our guys! Yes, this is hackish... but, we
             // do what we must. Its just too bad we have to loop over the entire entities array..
-            if (entity.hasC3() || entity.hasC3i() || entity.hasNavalC3()) {
-                boolean C3iSet = false;
 
-                for (Entity e : game.getEntitiesVector()) {
-
-                    // C3 Checks
-                    if (entity.hasC3()) {
-                        if ((entity.getC3MasterIsUUIDAsString() != null)
-                                && entity.getC3MasterIsUUIDAsString().equals(e.getC3UUIDAsString())) {
-                            entity.setC3Master(e, false);
-                            entity.setC3MasterIsUUIDAsString(null);
-                        } else if ((e.getC3MasterIsUUIDAsString() != null)
-                                && e.getC3MasterIsUUIDAsString().equals(entity.getC3UUIDAsString())) {
-                            e.setC3Master(entity, false);
-                            e.setC3MasterIsUUIDAsString(null);
-                            // Taharqa: we need to update the other entity for
-                            // the
-                            // client
-                            // or it won't show up right. I am not sure if I
-                            // like
-                            // the idea of updating other entities in this
-                            // method,
-                            // but it
-                            // will work for now.
-                            if (!entities.contains(e)) {
-                                entityUpdate(e.getId());
-                            }
-                        }
-                    }
-
-                    // C3i Checks
-                    if (entity.hasC3i() && !C3iSet) {
-                        entity.setC3NetIdSelf();
-                        int pos = 0;
-                        while (pos < Entity.MAX_C3i_NODES) {
-                            // We've found a network, join it.
-                            if ((entity.getC3iNextUUIDAsString(pos) != null)
-                                    && (e.getC3UUIDAsString() != null)
-                                    && entity.getC3iNextUUIDAsString(pos)
-                                    .equals(e.getC3UUIDAsString())) {
-                                entity.setC3NetId(e);
-                                C3iSet = true;
-                                break;
-                            }
-
-                            pos++;
-                        }
-                    }
-
-                    // NC3 Checks
-                    if (entity.hasNavalC3() && !C3iSet) {
-                        entity.setC3NetIdSelf();
-                        int pos = 0;
-                        while (pos < Entity.MAX_C3i_NODES) {
-                            // We've found a network, join it.
-                            if ((entity.getNC3NextUUIDAsString(pos) != null)
-                                    && (e.getC3UUIDAsString() != null)
-                                    && entity.getNC3NextUUIDAsString(pos)
-                                    .equals(e.getC3UUIDAsString())) {
-                                entity.setC3NetId(e);
-                                C3iSet = true;
-                                break;
-                            }
-
-                            pos++;
-                        }
-                    }
+            var c3affected = C3Util.wireC3(game, entity);
+            for (Entity e : c3affected) {
+                // Taharqa: we need to update the other entities for
+                // the client or it won't show up right. I am not sure if I
+                // like the idea of updating other entities in this
+                // method, but it will work for now.
+                if (!entities.contains(e)) {
+                    entityUpdate(e.getId());
                 }
             }
+
             // Give the unit a spotlight, if it has the spotlight quirk
             entity.setExternalSearchlight(entity.hasExternalSearchlight()
                     || entity.hasQuirk(OptionsConstants.QUIRK_POS_SEARCHLIGHT));
@@ -30153,25 +30089,15 @@ public class GameManager implements IGameManager {
         }
 
         // Make sure that the entity has the given equipment.
-        Mounted mWeap = e.getEquipment(weaponId);
-        Mounted mAmmo = e.getEquipment(ammoId);
-        Mounted oldAmmo = (mWeap == null) ? null : mWeap.getLinked();
+        WeaponMounted mWeap = (WeaponMounted) e.getEquipment(weaponId);
+        AmmoMounted mAmmo = (AmmoMounted) e.getEquipment(ammoId);
+        AmmoMounted oldAmmo = (mWeap == null) ? null : mWeap.getLinkedAmmo();
         if (null == mAmmo) {
             LogManager.getLogger().error("Entity " + e.getDisplayName() + " does not have ammo #" + ammoId);
             return;
         }
-        if (!(mAmmo.getType() instanceof AmmoType)) {
-            LogManager.getLogger().error("Item #" + ammoId + " of entity " + e.getDisplayName()
-                    + " is a " + mAmmo.getName() + " and not ammo.");
-            return;
-        }
         if (null == mWeap) {
             LogManager.getLogger().error("Entity " + e.getDisplayName() + " does not have weapon #" + weaponId);
-            return;
-        }
-        if (!(mWeap.getType() instanceof WeaponType)) {
-            LogManager.getLogger().error("Item #" + weaponId + " of entity " + e.getDisplayName()
-                    + " is a " + mWeap.getName() + " and not a weapon.");
             return;
         }
         if (((WeaponType) mWeap.getType()).getAmmoType() == AmmoType.T_NA) {
@@ -30197,9 +30123,6 @@ public class GameManager implements IGameManager {
             r.add(mAmmo.getShortName());
             r.add(ReportMessages.getString(String.valueOf(reason)));
             addReport(r);
-            if (LogManager.getLogger().isDebugEnabled()) {
-
-            }
         }
     }
 
@@ -30427,13 +30350,6 @@ public class GameManager implements IGameManager {
     }
 
     /**
-     * Creates a packet containing the player ready status
-     */
-    private Packet createPlayerDonePacket(int playerId) {
-        return new Packet(PacketCommand.PLAYER_READY, playerId, game.getPlayer(playerId).isDone());
-    }
-
-    /**
      * Creates a packet containing the current turn vector
      */
     private Packet createTurnVectorPacket() {
@@ -30457,27 +30373,6 @@ public class GameManager implements IGameManager {
 
     private Packet createMapSizesPacket() {
         return new Packet(PacketCommand.SENDING_AVAILABLE_MAP_SIZES, getBoardSizes());
-    }
-
-    /**
-     * Creates a packet containing the planetary conditions
-     */
-    private Packet createPlanetaryConditionsPacket() {
-        return new Packet(PacketCommand.SENDING_PLANETARY_CONDITIONS, getGame().getPlanetaryConditions());
-    }
-
-    /**
-     * Creates a packet containing the game settings
-     */
-    private Packet createGameSettingsPacket() {
-        return new Packet(PacketCommand.SENDING_GAME_SETTINGS, getGame().getOptions());
-    }
-
-    /**
-     * Creates a packet containing the game board
-     */
-    private Packet createBoardPacket() {
-        return new Packet(PacketCommand.SENDING_BOARD, getGame().getBoard());
     }
 
     /**
@@ -30650,9 +30545,7 @@ public class GameManager implements IGameManager {
      * Sends out the player ready stats for all players to all connections
      */
     private void transmitAllPlayerDones() {
-        for (Player player : getGame().getPlayersList()) {
-            send(createPlayerDonePacket(player.getId()));
-        }
+        getGame().getPlayersList().forEach(player -> send(packetHelper.createPlayerDonePacket(player.getId())));
     }
 
     /**
@@ -30706,22 +30599,6 @@ public class GameManager implements IGameManager {
     public void sendVisibilityIndicator(Entity e) {
         send(new Packet(PacketCommand.ENTITY_VISIBILITY_INDICATOR, e.getId(), e.isEverSeenByEnemy(),
                 e.isVisibleToEnemy(), e.isDetectedByEnemy(), e.getWhoCanSee(), e.getWhoCanDetect()));
-    }
-
-    /**
-     * Creates a packet for an attack
-     */
-    private Packet createAttackPacket(List<?> vector, int charges) {
-        return new Packet(PacketCommand.ENTITY_ATTACK, vector, charges);
-    }
-
-    /**
-     * Creates a packet for an attack
-     */
-    private Packet createAttackPacket(EntityAction ea, int charge) {
-        Vector<EntityAction> vector = new Vector<>(1);
-        vector.addElement(ea);
-        return new Packet(PacketCommand.ENTITY_ATTACK, vector, charge);
     }
 
     private Packet createSpecialHexDisplayPacket(int toPlayer) {
@@ -33278,6 +33155,7 @@ public class GameManager implements IGameManager {
                                                      boolean autoEject, Coords targetCoords, String desc) {
         PilotingRollData rollTarget = new PilotingRollData(entity.getId(),
                 entity.getCrew().getPiloting(crewPos), desc);
+        PlanetaryConditions conditions = game.getPlanetaryConditions();
         // Per SO p26, fighters can eject as per TO rules on 196 with some exceptions
         if (entity.isProne()) {
             rollTarget.addModifier(5, "Mech is prone");
@@ -33339,35 +33217,33 @@ public class GameManager implements IGameManager {
         if (!entity.isSpaceborne()) {
             // At present, the UI lets you set these atmospheric conditions for a space battle, but it shouldn't
             // That's a fix for another day, probably when I get around to space terrain and 'weather'
-            if (game.getPlanetaryConditions().getGravity() == 0) {
+            if (conditions.getGravity() == 0) {
                 rollTarget.addModifier(3, "Zero-G");
-            } else if (game.getPlanetaryConditions().getGravity() < 0.8) {
+            } else if (conditions.getGravity() < 0.8) {
                 rollTarget.addModifier(2, "Low-G");
-            } else if (game.getPlanetaryConditions().getGravity() > 1.2) {
+            } else if (conditions.getGravity() > 1.2) {
                 rollTarget.addModifier(2, "High-G");
             }
 
             //Vacuum shouldn't apply to ASF ejection since they're designed for it, but the rules don't specify
             //High and low pressures make more sense to apply to all
-            if (game.getPlanetaryConditions().getAtmosphere() == PlanetaryConditions.ATMO_VACUUM) {
+            if (conditions.getAtmosphere().isVacuum()) {
                 rollTarget.addModifier(3, "Vacuum");
-            } else if (game.getPlanetaryConditions().getAtmosphere() == PlanetaryConditions.ATMO_VHIGH) {
+            } else if (conditions.getAtmosphere().isVeryHigh()) {
                 rollTarget.addModifier(2, "Very High Atmosphere Pressure");
-            } else if (game.getPlanetaryConditions().getAtmosphere() == PlanetaryConditions.ATMO_TRACE) {
+            } else if (conditions.getAtmosphere().isTrace()) {
                 rollTarget.addModifier(2, "Trace atmosphere");
             }
         }
 
-        if ((game.getPlanetaryConditions().getWeather() == PlanetaryConditions.WE_HEAVY_SNOW)
-                || (game.getPlanetaryConditions().getWeather() == PlanetaryConditions.WE_ICE_STORM)
-                || (game.getPlanetaryConditions().getWeather() == PlanetaryConditions.WE_DOWNPOUR)
-                || (game.getPlanetaryConditions().getWindStrength() == PlanetaryConditions.WI_STRONG_GALE)) {
+
+        if (conditions.getWeather().isDownpourOrHeavySnowOrIceStorm()
+                || conditions.getWind().isStrongGale()) {
             rollTarget.addModifier(2, "Bad Weather");
         }
 
-        if ((game.getPlanetaryConditions().getWindStrength() >= PlanetaryConditions.WI_STORM)
-                || ((game.getPlanetaryConditions().getWeather() == PlanetaryConditions.WE_HEAVY_SNOW) && (game
-                .getPlanetaryConditions().getWindStrength() == PlanetaryConditions.WI_STRONG_GALE))) {
+        if (conditions.getWind().isStrongerThan(Wind.STRONG_GALE)
+                || (conditions.getWeather().isHeavySnow() && conditions.getWind().isStrongGale())) {
             rollTarget.addModifier(3, "Really Bad Weather");
         }
         return rollTarget;
@@ -33456,7 +33332,9 @@ public class GameManager implements IGameManager {
             r.indent(3);
             vDesc.addElement(r);
             // Don't make ill-equipped pilots abandon into vacuum
-            if (game.getPlanetaryConditions().isVacuum() && !entity.isAero()) {
+            PlanetaryConditions conditions = game.getPlanetaryConditions();
+            if (conditions.getAtmosphere().isLighterThan(Atmosphere.THIN)
+                    && !entity.isAero()) {
                 return vDesc;
             }
 
@@ -33498,7 +33376,8 @@ public class GameManager implements IGameManager {
         else if (game.getOptions().booleanOption(OptionsConstants.ADVGRNDMOV_VEHICLES_CAN_EJECT)
                 && (entity instanceof Tank)) {
             // Don't make them abandon into vacuum
-            if (game.getPlanetaryConditions().isVacuum()) {
+            PlanetaryConditions conditions = game.getPlanetaryConditions();
+            if (conditions.getAtmosphere().isLighterThan(Atmosphere.THIN)) {
                 return vDesc;
             }
             EjectedCrew crew = new EjectedCrew(entity);
@@ -34828,8 +34707,8 @@ public class GameManager implements IGameManager {
     private Vector<Report> resolveBlowingSandDamage() {
         Vector<Report> vFullReport = new Vector<>();
         vFullReport.add(new Report(5002, Report.PUBLIC));
-        int damage_bonus = Math.max(0, game.getPlanetaryConditions().getWindStrength()
-                - PlanetaryConditions.WI_MOD_GALE);
+        int damage_bonus = Math.max(0, game.getPlanetaryConditions().getWind().ordinal()
+                - Wind.MOD_GALE.ordinal());
         // cycle through each team and damage 1d6 airborne VTOL/WiGE
         for (Team team : game.getTeams()) {
             Vector<Integer> airborne = getAirborneVTOL(team);
@@ -34883,27 +34762,27 @@ public class GameManager implements IGameManager {
      * @param mineId an <code>int</code> pointing to the mine
      */
     private void layMine(Entity entity, int mineId, Coords coords) {
-        Mounted mine = entity.getEquipment(mineId);
+        MiscMounted mine = (MiscMounted) entity.getEquipment(mineId);
         Report r;
         if (!mine.isMissing()) {
             int reportId = 0;
             switch (mine.getMineType()) {
-                case Mounted.MINE_CONVENTIONAL:
+                case MiscMounted.MINE_CONVENTIONAL:
                     deliverThunderMinefield(coords, entity.getOwnerId(), 10,
                             entity.getId());
                     reportId = 3500;
                     break;
-                case Mounted.MINE_VIBRABOMB:
+                case MiscMounted.MINE_VIBRABOMB:
                     deliverThunderVibraMinefield(coords, entity.getOwnerId(), 10,
                             mine.getVibraSetting(), entity.getId());
                     reportId = 3505;
                     break;
-                case Mounted.MINE_ACTIVE:
+                case MiscMounted.MINE_ACTIVE:
                     deliverThunderActiveMinefield(coords, entity.getOwnerId(), 10,
                             entity.getId());
                     reportId = 3510;
                     break;
-                case Mounted.MINE_INFERNO:
+                case MiscMounted.MINE_INFERNO:
                     deliverThunderInfernoMinefield(coords, entity.getOwnerId(), 10,
                             entity.getId());
                     reportId = 3515;

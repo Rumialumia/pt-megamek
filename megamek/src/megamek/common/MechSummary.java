@@ -14,15 +14,18 @@
  */
 package megamek.common;
 
+import megamek.client.ui.Base64Image;
 import megamek.codeUtilities.StringUtility;
 import megamek.common.alphaStrike.*;
 import megamek.common.annotations.Nullable;
 import megamek.common.options.*;
 import org.apache.logging.log4j.LogManager;
 
+import java.awt.*;
 import java.io.File;
 import java.io.Serializable;
 import java.util.*;
+import java.util.List;
 import java.util.stream.Collectors;
 
 /**
@@ -39,6 +42,7 @@ public class MechSummary implements Serializable, ASCardDisplayable {
     private String unitSubType;
     private String fullAccurateUnitType;
     private Long entityType;
+    private Base64Image fluffImage = new Base64Image();
     private boolean omni;
     private boolean military;
     private boolean mountedInfantry;
@@ -1024,17 +1028,26 @@ public class MechSummary implements Serializable, ASCardDisplayable {
         this.jumpMp = jumpMp;
     }
 
+    public void setFluffImage(String base64image) {
+        fluffImage = new Base64Image(base64image);
+    }
+
+    @Override
+    public @Nullable Image getFluffImage() {
+        return fluffImage.getImage();
+    }
+
     /**
      * Given the list of equipment mounted on this unit, parse it into a unique
      * list of names and the number of times that name appears.
      *
      * @param mountedList A collection of <code>Mounted</code> equipment
      */
-    public void setEquipment(List<Mounted> mountedList)
+    public void setEquipment(List<Mounted<?>> mountedList)
     {
         equipmentNames = new Vector<>(mountedList.size());
         equipmentQuantities = new Vector<>(mountedList.size());
-        for (Mounted mnt : mountedList)
+        for (Mounted<?> mnt : mountedList)
         {
             // Ignore weapon groups, as they aren't actually real equipment
             if (mnt.isWeaponGroup()) {
@@ -1073,7 +1086,7 @@ public class MechSummary implements Serializable, ASCardDisplayable {
 
     public void setWeaponQuirkNames(Entity entity) {
         Set<String> weaponQuirkNameList = new HashSet<>();
-        for (Mounted mounted : entity.getEquipment()) {
+        for (Mounted<?> mounted : entity.getEquipment()) {
             weaponQuirkNameList.addAll(mounted.getQuirks().getOptionsList().stream()
                     .filter(IOption::booleanValue)
                     .map(IOptionInfo::getDisplayableNameWithValue)

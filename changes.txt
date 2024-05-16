@@ -19,3 +19,5 @@
 /megamek/src/megamek/common/weapons/piratetech/gaussrifles/ISSilverBulletHeavyGauss.java    - added new weapon, 2/26/24, Meows
 /megamek/src/megamek/common/weapons/piratetech/gaussrifles/ISSilverBulletLightGauss.java    - added new weapon, 2/26/24, Meows
 /megamek/src/megamek/common/WeaponType.java                                                 - added info for ISSilverBulletHeavyGauss, ISSilverBulletLightGauss, CLHAG10, 2/26/24, Rumia
+
+Updated base source to 0.49.20-Snapshot custom assets temporarily removed, 5/16/2024, Rumia

@@ -21,6 +21,7 @@
 package megamek.client.ui.swing.lobby;
 
 import megamek.MMConstants;
+import megamek.client.AbstractClient;
 import megamek.client.Client;
 import megamek.client.bot.BotClient;
 import megamek.client.bot.princess.BehaviorSettings;
@@ -33,6 +34,7 @@ import megamek.client.ui.dialogs.*;
 import megamek.client.ui.enums.DialogResult;
 import megamek.client.ui.swing.*;
 import megamek.client.ui.swing.boardview.BoardView;
+import megamek.client.ui.swing.boardview.TWBoardViewTooltip;
 import megamek.client.ui.swing.dialog.DialogButton;
 import megamek.client.ui.swing.dialog.MMConfirmDialog;
 import megamek.client.ui.swing.lobby.PlayerTable.PlayerTableModel;
@@ -762,8 +764,9 @@ public class ChatLounge extends AbstractPhaseDisplay implements
         try {
             boardPreviewGame.setPhase(GamePhase.LOUNGE);
             previewBV = new BoardView(boardPreviewGame, null, null);
-            previewBV.setDisplayInvalidHexInfo(false);
-            previewBV.setUseLOSTool(false);
+            previewBV.setDisplayInvalidFields(false);
+            previewBV.setUseLosTool(false);
+            previewBV.setTooltipProvider(new TWBoardViewTooltip(boardPreviewGame, clientgui, previewBV));
             JButton bpButton = new JButton(Messages.getString("BoardSelectionDialog.ViewGameBoardButton"));
             bpButton.addActionListener(e -> previewGameBoard());
             JPanel bpPanel = new JPanel();
@@ -776,6 +779,12 @@ public class ChatLounge extends AbstractPhaseDisplay implements
             bpPanel.add(previewBV.getComponent(true));
             boardPreviewW.add(bpPanel);
             boardPreviewW.setSize(clientgui.frame.getWidth() / 2, clientgui.frame.getHeight() / 2);
+
+            String closeAction = "closeAction";
+            final KeyStroke escape = KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0);
+            boardPreviewW.getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(escape, closeAction);
+            boardPreviewW.getRootPane().getInputMap(JComponent.WHEN_FOCUSED).put(escape, closeAction);
+            boardPreviewW.getRootPane().getActionMap().put(closeAction, new CloseAction(boardPreviewW));
 
             Ruler.color1 = GUIP.getRulerColor1();
             Ruler.color2 = GUIP.getRulerColor2();
@@ -1174,7 +1183,7 @@ public class ChatLounge extends AbstractPhaseDisplay implements
             boardPreviewGame.removePlayer(player.getId());
         }
         for (Player player : game().getPlayersList()) {
-            boardPreviewGame.setPlayer(player.getId(), player);
+            boardPreviewGame.setPlayer(player.getId(), player.copy());
         }
         boardPreviewW.setVisible(true);
     }
@@ -1489,6 +1498,10 @@ public class ChatLounge extends AbstractPhaseDisplay implements
         }
     }
 
+    void sendProxyUpdates(Collection<Entity> updateCandidates, Player player) {
+        getLocalClient(player).sendUpdateEntity(updateCandidates);
+    }
+
     /**
      * Sends the entities in the given Collection to the Server.
      * Sends only those that can be edited, i.e. the player's own
@@ -1556,7 +1569,15 @@ public class ChatLounge extends AbstractPhaseDisplay implements
      */
     Client getLocalClient(Entity entity) {
         if (clientgui.getLocalBots().containsKey(entity.getOwner().getName())) {
-            return clientgui.getLocalBots().get(entity.getOwner().getName());
+            return (Client) clientgui.getLocalBots().get(entity.getOwner().getName());
+        } else {
+            return clientgui.getClient();
+        }
+    }
+
+    Client getLocalClient(Player player) {
+        if (clientgui.getLocalBots().containsKey(player.getName())) {
+            return (Client) clientgui.getLocalBots().get(player.getName());
         } else {
             return clientgui.getClient();
         }
@@ -2007,7 +2028,7 @@ public class ChatLounge extends AbstractPhaseDisplay implements
 
     private void removeBot() {
         Client c = getSelectedClient();
-        if (!client().localBots.containsValue(c)) {
+        if (!client().getBots().containsValue(c)) {
             LobbyErrors.showOnlyOwnBot(clientgui.frame);
             return;
         }
@@ -2170,7 +2191,7 @@ public class ChatLounge extends AbstractPhaseDisplay implements
                 players.add(client.getLocalPlayer().getName());
             }
 
-            for (Client bc : clientgui.getLocalBots().values()) {
+            for (AbstractClient bc : clientgui.getLocalBots().values()) {
                 if ((game.getLiveCommandersOwnedBy(bc.getLocalPlayer()) < 1)
                         && (game.getEntitiesOwnedBy(bc.getLocalPlayer()) > 0)) {
                     players.add(bc.getLocalPlayer().getName());
@@ -2198,7 +2219,7 @@ public class ChatLounge extends AbstractPhaseDisplay implements
         boolean done = !localPlayer().isDone();
         client.sendDone(done);
         refreshDoneButton(done);
-        for (Client botClient : clientgui.getLocalBots().values()) {
+        for (AbstractClient botClient : clientgui.getLocalBots().values()) {
             botClient.sendDone(done);
         }
     }
@@ -2211,8 +2232,8 @@ public class ChatLounge extends AbstractPhaseDisplay implements
         Player player = playerModel.getPlayerAt(tablePlayers.getSelectedRow());
         if (localPlayer().equals(player)) {
             return client();
-        } else if (client().localBots.containsKey(player.getName())) {
-            return client().localBots.get(player.getName());
+        } else if (client().getBots().containsKey(player.getName())) {
+            return (Client) client().getBots().get(player.getName());
         } else {
             return null;
         }
@@ -3583,7 +3604,7 @@ public class ChatLounge extends AbstractPhaseDisplay implements
 
     public void killPreviewBV() {
         if (previewBV != null) {
-            previewBV.die();
+            previewBV.dispose();
         }
     }
 }

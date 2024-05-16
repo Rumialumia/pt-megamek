@@ -18,9 +18,6 @@ import megamek.common.SimpleTechLevel;
 /**
  * @author Jason Tighe
  * @since Sep 12, 2004
- * Modified:
- * @author Rumia
- * @since Feb 26, 2024
  */
 public class ISBinaryLaserCannon extends LaserWeapon {
     private static final long serialVersionUID = -6849916948609019186L;

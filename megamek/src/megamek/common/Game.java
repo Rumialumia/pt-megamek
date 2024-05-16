@@ -28,6 +28,9 @@ import megamek.common.event.*;
 import megamek.common.force.Forces;
 import megamek.common.options.GameOptions;
 import megamek.common.options.OptionsConstants;
+import megamek.common.planetaryconditions.PlanetaryConditions;
+import megamek.common.planetaryconditions.Wind;
+import megamek.common.planetaryconditions.WindDirection;
 import megamek.common.weapons.AttackHandler;
 import megamek.server.SmokeCloud;
 import megamek.server.victory.Victory;
@@ -45,7 +48,7 @@ import static java.util.stream.Collectors.toList;
  * Client and the Server should have one of these objects, and it is their job to
  * keep it synched.
  */
-public class Game extends AbstractGame implements Serializable {
+public class Game extends AbstractGame implements Serializable, PlanetaryConditionsUsing {
     private static final long serialVersionUID = 8376320092671792532L;
 
     /**
@@ -59,8 +62,6 @@ public class Game extends AbstractGame implements Serializable {
     public final Version version = MMConstants.VERSION;
 
     private GameOptions options = new GameOptions();
-
-    private Board board = new Board();
 
     private MapSettings mapSettings = MapSettings.getInstance();
 
@@ -80,11 +81,6 @@ public class Game extends AbstractGame implements Serializable {
      * how's the weather?
      */
     private PlanetaryConditions planetaryConditions = new PlanetaryConditions();
-
-    /**
-     * what round is it?
-     */
-    private int roundCount = 0;
 
     /**
      * The current turn list
@@ -144,8 +140,6 @@ public class Game extends AbstractGame implements Serializable {
     // smoke clouds
     private List<SmokeCloud> smokeCloudList = new CopyOnWriteArrayList<>();
 
-    private transient Vector<GameListener> gameListeners = new Vector<>();
-
     /**
      * Stores princess behaviors for game factions. It does not indicate that a faction is currently
      * played by a bot, only that the most recent bot connected as that faction used these settings.
@@ -157,6 +151,7 @@ public class Game extends AbstractGame implements Serializable {
      * Constructor
      */
     public Game() {
+        setBoard(0, new Board());
         // empty
     }
 
@@ -173,18 +168,12 @@ public class Game extends AbstractGame implements Serializable {
         return version;
     }
 
-    public Board getBoard() {
-        return board;
-    }
-
     public void setBoard(Board board) {
-        Board oldBoard = this.board;
-        setBoardDirect(board);
-        processGameEvent(new GameBoardNewEvent(this, oldBoard, board));
+        receiveBoard(0, board);
     }
 
     public void setBoardDirect(final Board board) {
-        this.board = board;
+        setBoard(0, board);
     }
 
     public boolean containsMinefield(Coords coords) {
@@ -382,6 +371,16 @@ public class Game extends AbstractGame implements Serializable {
                 }
             }
         }
+
+        // Carry over faction settings
+        for (Team newTeam : initTeams) {
+            for (Team oldTeam : teams) {
+                if (newTeam.equals(oldTeam)) {
+                    newTeam.setFaction(oldTeam.getFaction());
+                }
+            }
+        }
+
         teams.clear();
         teams.addAll(initTeams);
     }
@@ -401,6 +400,7 @@ public class Game extends AbstractGame implements Serializable {
         updatePlayer(player);
     }
 
+    @Override
     public void setPlayer(int id, Player player) {
         player.setGame(this);
         players.put(id, player);
@@ -584,6 +584,7 @@ public class Game extends AbstractGame implements Serializable {
     /**
      * Returns true if there is a turn after the current one
      */
+    @Override
     public boolean hasMoreTurns() {
         return turnVector.size() > turnIndex;
     }
@@ -669,6 +670,12 @@ public class Game extends AbstractGame implements Serializable {
         return phase;
     }
 
+    @Override
+    public void receivePhase(GamePhase phase) {
+        setPhase(phase);
+    }
+
+    @Override
     public void setPhase(GamePhase phase) {
         final GamePhase oldPhase = this.phase;
         this.phase = phase;
@@ -701,6 +708,10 @@ public class Game extends AbstractGame implements Serializable {
         }
 
         processGameEvent(new GamePhaseChangeEvent(this, oldPhase, phase));
+    }
+
+    public void processGameEvent(GameEvent event) {
+        fireGameEvent(event);
     }
 
     public GamePhase getLastPhase() {
@@ -1113,7 +1124,7 @@ public class Game extends AbstractGame implements Serializable {
                 case Targetable.TYPE_BLDG_IGNITE:
                 case Targetable.TYPE_BLDG_TAG:
                     if (getBoard().getBuildingAt(BuildingTarget.idToCoords(nID)) != null) {
-                        return new BuildingTarget(BuildingTarget.idToCoords(nID), board, nType);
+                        return new BuildingTarget(BuildingTarget.idToCoords(nID), getBoard(), nType);
                     } else {
                         return null;
                     }
@@ -1278,6 +1289,11 @@ public class Game extends AbstractGame implements Serializable {
         return lastEntityId + 1;
     }
 
+    @Override
+    public void replaceUnits(List<InGameObject> units) {
+        addEntities(filterToEntity(units));
+    }
+
     /**
      * @return <code>true</code> if an entity with the specified id number exists in this game.
      */
@@ -1339,7 +1355,7 @@ public class Game extends AbstractGame implements Serializable {
     public synchronized void reset() {
         uuid = UUID.randomUUID();
 
-        roundCount = 0;
+        currentRound = 0;
 
         inGameObjects.clear();
         entityPosLookup.clear();
@@ -1527,7 +1543,7 @@ public class Game extends AbstractGame implements Serializable {
         Vector<GunEmplacement> vector = new Vector<>();
 
         // Only build the list if the coords are on the board.
-        if (board.contains(c)) {
+        if (getBoard().contains(c)) {
             for (Entity entity : getEntitiesVector(c, true)) {
                 if (entity.hasETypeFlag(Entity.ETYPE_GUN_EMPLACEMENT)) {
                     vector.addElement((GunEmplacement) entity);
@@ -1569,8 +1585,8 @@ public class Game extends AbstractGame implements Serializable {
      */
     public @Nullable Entity getAffaTarget(Coords c, Entity ignore) {
         Vector<Entity> vector = new Vector<>();
-        if (board.contains(c)) {
-            Hex hex = board.getHex(c);
+        if (getBoard().contains(c)) {
+            Hex hex = getBoard().getHex(c);
             for (Entity entity : getEntitiesVector(c)) {
                 if (entity.isTargetable()
                         && ((entity.getElevation() == 0) // Standing on hex surface
@@ -1612,6 +1628,10 @@ public class Game extends AbstractGame implements Serializable {
      */
     public Iterator<Entity> getAllEnemyEntities(final Entity currentEntity) {
         return getSelectedEntities(entity -> entity.isTargetable() && entity.isEnemyOf(currentEntity));
+    }
+
+    public Iterator<Entity> getTeamEntities(final Team team) {
+        return getSelectedEntities(entity -> team.players().contains(entity.getOwner()));
     }
 
     /**
@@ -2531,18 +2551,18 @@ public class Game extends AbstractGame implements Serializable {
      * @return Value of property roundCount.
      */
     public int getRoundCount() {
-        return roundCount;
+        return getCurrentRound();
     }
 
     public void setRoundCount(int roundCount) {
-        this.roundCount = roundCount;
+        setCurrentRound(roundCount);
     }
 
     /**
      * Increments the round counter
      */
     public void incrementRoundCount() {
-        roundCount++;
+        currentRound++;
     }
 
     /**
@@ -2572,7 +2592,7 @@ public class Game extends AbstractGame implements Serializable {
         if (v.isEmpty()) {
             return;
         }
-        gameReports.add(roundCount, v);
+        gameReports.add(getCurrentRound(), v);
     }
 
     /**
@@ -2934,72 +2954,6 @@ public class Game extends AbstractGame implements Serializable {
     }
 
     /**
-     * Adds the specified game listener to receive board events from this board.
-     *
-     * @param listener the game listener.
-     */
-    public void addGameListener(GameListener listener) {
-        // Since gameListeners is transient, it could be null
-        if (gameListeners == null) {
-            gameListeners = new Vector<>();
-        }
-        gameListeners.addElement(listener);
-    }
-
-    /**
-     * Removes the specified game listener.
-     *
-     * @param listener the game listener.
-     */
-    public void removeGameListener(GameListener listener) {
-        // Since gameListeners is transient, it could be null
-        if (gameListeners == null) {
-            gameListeners = new Vector<>();
-        }
-        gameListeners.removeElement(listener);
-    }
-
-    /**
-     * Returns all the GameListeners.
-     *
-     * @return
-     */
-    public List<GameListener> getGameListeners() {
-        // Since gameListeners is transient, it could be null
-        if (gameListeners == null) {
-            gameListeners = new Vector<>();
-        }
-        return Collections.unmodifiableList(gameListeners);
-    }
-
-    /**
-     * purges all Game Listener objects.
-     */
-    public void purgeGameListeners() {
-        // Since gameListeners is transient, it could be null
-        if (gameListeners == null) {
-            gameListeners = new Vector<>();
-        }
-        gameListeners.clear();
-    }
-
-    /**
-     * Processes game events occurring on this connection by dispatching them to
-     * any registered GameListener objects.
-     *
-     * @param event the game event.
-     */
-    public void processGameEvent(GameEvent event) {
-        // Since gameListeners is transient, it could be null
-        if (gameListeners == null) {
-            gameListeners = new Vector<>();
-        }
-        for (Enumeration<GameListener> e = gameListeners.elements(); e.hasMoreElements(); ) {
-            event.fireEvent(e.nextElement());
-        }
-    }
-
-    /**
      * @return this turn's TAG information
      */
     public Vector<TagInfo> getTagInfo() {
@@ -3103,10 +3057,10 @@ public class Game extends AbstractGame implements Serializable {
             if (flare.isIgnited()) {
                 flare.turnsToBurn--;
                 if (flare.isDrifting()) {
-                    int str = planetaryConditions.getWindStrength();
-                    if (str > 0) {
-                        int dir = planetaryConditions.getWindDirection();
-                        flare.position = flare.position.translated(dir, (str > 1) ? (str - 1) : str);
+                    Wind wind = planetaryConditions.getWind();
+                    if (!planetaryConditions.getWind().isCalm()) {
+                        WindDirection dir = planetaryConditions.getWindDirection();
+                        flare.position = flare.position.translated(dir.ordinal(), (wind.ordinal() > 1) ? (wind.ordinal() - 1) : wind.ordinal());
                         if (getBoard().contains(flare.position)) {
                             r = new Report(5236);
                             r.add(flare.position.getBoardNum());
@@ -3168,7 +3122,7 @@ public class Game extends AbstractGame implements Serializable {
     // applicable
     public boolean useVectorMove() {
         return getOptions().booleanOption(OptionsConstants.ADVAERORULES_ADVANCED_MOVEMENT)
-               && board.inSpace();
+               && getBoard().inSpace();
     }
 
     /**
@@ -3248,10 +3202,12 @@ public class Game extends AbstractGame implements Serializable {
                 (e instanceof SmallCraft) && getTurn().isValidEntity(e, this));
     }
 
+    @Override
     public PlanetaryConditions getPlanetaryConditions() {
         return planetaryConditions;
     }
 
+    @Override
     public void setPlanetaryConditions(final @Nullable PlanetaryConditions conditions) {
         if (conditions == null) {
             LogManager.getLogger().error("Can't set the planetary conditions to null!");
@@ -3456,6 +3412,10 @@ public class Game extends AbstractGame implements Serializable {
 
     /** @return The TW Units (Entity) currently in the game. */
     public List<Entity> inGameTWEntities() {
-        return inGameObjects.values().stream().filter(o -> o instanceof Entity).map(o -> (Entity) o).collect(toList());
+        return filterToEntity(inGameObjects.values());
+    }
+
+    private List<Entity> filterToEntity(Collection<? extends BTObject> objects) {
+        return objects.stream().filter(o -> o instanceof Entity).map(o -> (Entity) o).collect(toList());
     }
 }

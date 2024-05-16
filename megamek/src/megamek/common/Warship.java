@@ -281,4 +281,19 @@ public class Warship extends Jumpship {
     public void postProcessFacingChange() {
         mpUsed += 2;
     }
+
+    @Override
+    public boolean isJumpShip() {
+        return false;
+    }
+
+    @Override
+    public boolean isWarShip() {
+        return true;
+    }
+
+    @Override
+    public int getGenericBattleValue() {
+        return (int) Math.round(Math.exp(-1.3484 + 0.9382*Math.log(getWeight())));
+    }
 }

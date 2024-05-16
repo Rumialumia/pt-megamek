@@ -21,6 +21,7 @@ import megamek.client.ui.swing.widget.MegamekButton;
 import megamek.common.*;
 import megamek.common.actions.*;
 import megamek.common.enums.AimingMode;
+import megamek.common.equipment.MiscMounted;
 import megamek.common.event.GamePhaseChangeEvent;
 import megamek.common.event.GameTurnChangeEvent;
 import megamek.common.options.OptionsConstants;
@@ -29,9 +30,6 @@ import org.apache.logging.log4j.LogManager;
 import javax.swing.*;
 import java.awt.event.*;
 import java.util.*;
-
-import static megamek.client.ui.swing.util.UIUtil.guiScaledFontHTML;
-import static megamek.client.ui.swing.util.UIUtil.uiLightViolet;
 
 public class PhysicalDisplay extends AttackPhaseDisplay {
     private static final long serialVersionUID = -3274750006768636001L;
@@ -331,24 +329,36 @@ public class PhysicalDisplay extends AttackPhaseDisplay {
         setNextEnabled(false);
     }
 
+    private boolean checkNags() {
+        if (needNagForNoAction()) {
+            if (attacks.isEmpty()) {
+                // confirm this action
+                String title = Messages.getString("PhysicalDisplay.DontPhysicalAttackDialog.title");
+                String body = Messages.getString("PhysicalDisplay.DontPhysicalAttackDialog.message");
+                if (checkNagForNoAction(title, body)) {
+                    return true;
+                }
+            }
+        }
+
+        if (ce() == null) {
+            return true;
+        }
+
+        return false;
+    }
+
     /**
      * Called when the current entity is done with physical attacks.
      */
     @Override
     public void ready() {
-        if (attacks.isEmpty() && needNagForNoAction()) {
-            // confirm this action
-            ConfirmDialog response = clientgui.doYesNoBotherDialog(
-                    Messages.getString("PhysicalDisplay.DontPhysicalAttackDialog.title"),
-                    Messages.getString("PhysicalDisplay.DontPhysicalAttackDialog.message"));
-            if (!response.getShowAgain()) {
-                GUIP.setNagForNoAction(false);
-            }
-            if (!response.getAnswer()) {
-                return;
-            }
+        if (checkNags()) {
+            return;
         }
+
         disableButtons();
+
         clientgui.getClient().sendAttackData(cen, attacks.toVector());
         removeAllAttacks();
         // close aimed shot display, if any
@@ -812,20 +822,20 @@ public class PhysicalDisplay extends AttackPhaseDisplay {
         }
     }
 
-    private Mounted chooseClub() {
-        java.util.List<Mounted> clubs = ce().getClubs();
+    private MiscMounted chooseClub() {
+        java.util.List<MiscMounted> clubs = ce().getClubs();
         if (clubs.size() == 1) {
             return clubs.get(0);
         } else if (clubs.size() > 1) {
             String[] names = new String[clubs.size()];
             for (int loop = 0; loop < names.length; loop++) {
-                Mounted club = clubs.get(loop);
+                MiscMounted club = clubs.get(loop);
                 final ToHitData toHit = ClubAttackAction.toHit(clientgui.getClient().getGame(), cen,
                         target, club, ash.getAimTable(), false);
                 final int dmg = ClubAttackAction.getDamageFor(ce(), club,
                         target.isConventionalInfantry(), false);
                 // Need to do this outside getDamageFor, as it only returns int
-                String dmgString = dmg + "";
+                String dmgString = String.valueOf(dmg);
                 if ((club.getType().hasSubType(MiscType.S_COMBINE)
                         || club.getType().hasSubType(MiscType.S_CHAINSAW)
                         || club.getType().hasSubType(MiscType.S_DUAL_SAW))
@@ -855,14 +865,14 @@ public class PhysicalDisplay extends AttackPhaseDisplay {
      * Club that target!
      */
     void club() {
-        Mounted club = chooseClub();
+        MiscMounted club = chooseClub();
         club(club);
     }
 
     /**
      * Club that target!
      */
-    void club(Mounted club) {
+    void club(MiscMounted club) {
         if (null == club) {
             return;
         }
@@ -885,7 +895,7 @@ public class PhysicalDisplay extends AttackPhaseDisplay {
                 isAptPiloting);
         final int clubDmg = ClubAttackAction.getDamageFor(en, club, target.isConventionalInfantry(), false);
         // Need to do this outside getDamageFor, as it only returns int
-        String dmgString = clubDmg + "";
+        String dmgString = String.valueOf(clubDmg);
         if ((club.getType().hasSubType(MiscType.S_COMBINE)
                 || club.getType().hasSubType(MiscType.S_CHAINSAW)
                 || club.getType().hasSubType(MiscType.S_DUAL_SAW))

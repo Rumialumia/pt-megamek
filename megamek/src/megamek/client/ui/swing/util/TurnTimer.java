@@ -40,6 +40,7 @@ public class TurnTimer {
     private AbstractPhaseDisplay phaseDisplay;
     private boolean extendTimer;
     private boolean allowExtension;
+    private boolean expired;
     private Client client;
 
     private static final GUIPreferences GUIP = GUIPreferences.getInstance();
@@ -49,6 +50,7 @@ public class TurnTimer {
         // linit in seconds.
         timeLimit = limit;
         extendTimer = false;
+        expired = false;
         this.client = client;
 
         display = new JPanel();
@@ -90,14 +92,9 @@ public class TurnTimer {
                     extendTimer = false;
                     client.sendChat("Turn Timer extended");
                 } else if (counter < 1) {
-                    // get the NagForNoAction setting here
-                    boolean nagSet = GUIPreferences.getInstance().getNagForNoAction();
                     // prevent the popup dialog from breaking time limit
-                    GUIPreferences.getInstance().setNagForNoAction(false);
+                    expired = true;
                     phaseDisplay.ready();
-                    // reset NagForNoAction to the value it was before to preserve the user experience
-                    // for use cases outside the timer
-                    GUIPreferences.getInstance().setNagForNoAction(nagSet);
                     timer.stop();
                     display.setVisible(false);
                     phaseDisplay.getClientgui().getMenuBar().remove(display);
@@ -123,11 +120,17 @@ public class TurnTimer {
             phaseDisplay.getClientgui().getMenuBar().remove(display);
         }
 
-        timer.stop();
+        if (timer != null) {
+            timer.stop();
+        }
     }
 
     public void setExtendTimer() {
         extendTimer = true;
+    }
+
+    public boolean isTimerExpired() {
+        return expired;
     }
 
     public static TurnTimer init(AbstractPhaseDisplay phaseDisplay, Client client) {

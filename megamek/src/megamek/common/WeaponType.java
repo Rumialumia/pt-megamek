@@ -15,16 +15,13 @@
 package megamek.common;
 
 import java.math.BigInteger;
+import java.util.List;
+import java.util.Set;
 
 import megamek.common.alphaStrike.AlphaStrikeElement;
-import megamek.common.weapons.AlamoMissileWeapon;
-import megamek.common.weapons.AltitudeBombAttack;
-import megamek.common.weapons.DiveBombAttack;
-import megamek.common.weapons.LegAttack;
-import megamek.common.weapons.SpaceBombAttack;
-import megamek.common.weapons.StopSwarmAttack;
-import megamek.common.weapons.SwarmAttack;
-import megamek.common.weapons.SwarmWeaponAttack;
+import megamek.common.equipment.AmmoMounted;
+import megamek.common.equipment.WeaponMounted;
+import megamek.common.weapons.*;
 import megamek.common.weapons.artillery.*;
 import megamek.common.weapons.autocannons.*;
 import megamek.common.weapons.battlearmor.*;
@@ -59,7 +56,6 @@ import megamek.common.weapons.mortars.ISMekMortar4;
 import megamek.common.weapons.mortars.ISMekMortar8;
 import megamek.common.weapons.mortars.ISVehicularGrenadeLauncher;
 import megamek.common.weapons.other.*;
-import megamek.common.weapons.piratetech.misc.PBurnBarrel;
 import megamek.common.weapons.ppc.*;
 import megamek.common.weapons.primitive.*;
 import megamek.common.weapons.prototypes.*;
@@ -68,15 +64,6 @@ import megamek.common.weapons.tag.CLLightTAG;
 import megamek.common.weapons.tag.CLTAG;
 import megamek.common.weapons.tag.ISTAG;
 import megamek.common.weapons.unofficial.*;
-
-/**
- * @author Rumia
- * @since Feb 25, 2024
- */
-// Piratetech
-import megamek.common.weapons.piratetech.autocannons.*;
-import megamek.common.weapons.piratetech.gaussrifles.*;
-import megamek.common.weapons.piratetech.lasers.*;
 
 // TODO add XML support back in.
 
@@ -226,8 +213,6 @@ public class WeaponType extends EquipmentType {
     // Used for TSEMP Weapons.
     public static final BigInteger F_TSEMP = BigInteger.valueOf(1).shiftLeft(57);
     public static final BigInteger F_REPEATING = BigInteger.valueOf(1).shiftLeft(72);
-
-    public static final BigInteger F_BURNBARREL = BigInteger.valueOf(1).shiftLeft(73);
 
     // add maximum range for AT2
     public static final int RANGE_SHORT = RangeType.RANGE_SHORT;
@@ -419,14 +404,12 @@ public class WeaponType extends EquipmentType {
     public int getHeat() {
         return heat;
     }
-    // Added Pirate Burn Barrel
+
     public int getFireTN() {
         if (hasFlag(F_NO_FIRES)) {
             return TargetRoll.IMPOSSIBLE;
         } else if (hasFlag(F_FLAMER)) {
-          return 4;
-        } else if (hasFlag(F_BURNBARREL)) {
-          return 0;
+            return 4;
         } else if (hasFlag(F_PLASMA)) {
             return 2;
         } else if (hasFlag(F_PLASMA_MFUK)) {
@@ -621,30 +604,30 @@ public class WeaponType extends EquipmentType {
         return waterExtremeRange;
     }
 
-    public int getMaxRange(Mounted weapon) {
+    public int getMaxRange(WeaponMounted weapon) {
         if (weapon == null) {
             return getMaxRange();
         }
-        return getMaxRange(weapon, weapon.getLinked());
+        return getMaxRange(weapon, weapon.getLinkedAmmo());
     }
 
     public int getMaxRange() {
         return maxRange;
     }
 
-    public int getMaxRange(Mounted weapon, Mounted ammo) {
-        if (getAmmoType() == AmmoType.T_ATM) {
-            AmmoType ammoType = (AmmoType) ammo.getType();
-            if ((ammoType.getAmmoType() == AmmoType.T_ATM)
-                    && (ammoType.getMunitionType().contains(AmmoType.Munitions.M_EXTENDED_RANGE))) {
-                return RANGE_EXT;
-            } else if ((ammoType.getAmmoType() == AmmoType.T_ATM)
-                    && (ammoType.getMunitionType().contains(AmmoType.Munitions.M_HIGH_EXPLOSIVE))) {
-                return RANGE_SHORT;
+    public int getMaxRange(WeaponMounted weapon, AmmoMounted ammo) {
+        if (weapon.getType().getAtClass() == CLASS_ATM) {
+            AmmoType ammoType = ammo.getType();
+            if (List.of(AmmoType.T_ATM, AmmoType.T_IATM).contains(ammoType.getAmmoType())) {
+                if (ammoType.getMunitionType().contains(AmmoType.Munitions.M_EXTENDED_RANGE)) {
+                    return RANGE_EXT;
+                } else if (ammoType.getMunitionType().contains(AmmoType.Munitions.M_HIGH_EXPLOSIVE)) {
+                    return RANGE_SHORT;
+                }
             }
         }
         if (getAmmoType() == AmmoType.T_MML) {
-            AmmoType ammoType = (AmmoType) ammo.getType();
+            AmmoType ammoType = ammo.getType();
             if (ammoType.hasFlag(AmmoType.F_MML_LRM) || (getAmmoType() == AmmoType.T_LRM_TORPEDO)) {
                 return RANGE_LONG;
             } else {
@@ -1376,8 +1359,8 @@ public class WeaponType extends EquipmentType {
         EquipmentType.addType(new CLPlasmaRifle());
         EquipmentType.addType(new CLRAC2());
         EquipmentType.addType(new CLRAC5());
-        //EquipmentType.addType(new CLRAC10());
-        //EquipmentType.addType(new CLRAC20());
+        EquipmentType.addType(new CLRAC10());
+        EquipmentType.addType(new CLRAC20());
 
         // misc lvl3 stuff
         EquipmentType.addType(new ISRailGun());
@@ -2192,25 +2175,6 @@ public class WeaponType extends EquipmentType {
         EquipmentType.addType(new ISAPDS());
         EquipmentType.addType(new ISBAAPDS());
         EquipmentType.addType(new ISRISCHyperLaser());
-
-        /**
-        * @author Rumia
-        * @since Feb 25, 2024
-        */
-        // Piratetech Weapons
-        EquipmentType.addType(new PTISRAC10());
-        EquipmentType.addType(new PTISRAC20());
-        EquipmentType.addType(new ISHVAC20());
-        EquipmentType.addType(new PBallista());
-        EquipmentType.addType(new PHBallista());
-        EquipmentType.addType(new PLBallista());
-        EquipmentType.addType(new PCannon());
-        EquipmentType.addType(new ISMBinaryLaserCannon());
-        EquipmentType.addType(new ISSBinaryLaserCannon());
-        EquipmentType.addType(new CLHAG10());
-        EquipmentType.addType(new ISSilverBulletHeavyGauss());
-        EquipmentType.addType(new ISSilverBulletLightGauss());
-        EquipmentType.addType(new PBurnBarrel());
     }
 
     public int getExplosionDamage() {

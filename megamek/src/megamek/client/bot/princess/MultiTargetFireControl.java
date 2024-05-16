@@ -20,7 +20,10 @@ import java.util.List;
 import java.util.Map;
 
 import megamek.common.*;
+import megamek.common.equipment.AmmoMounted;
+import megamek.common.equipment.WeaponMounted;
 import megamek.common.options.OptionsConstants;
+import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 
 /**
@@ -43,7 +46,7 @@ public class MultiTargetFireControl extends FireControl {
     public FiringPlan getBestFiringPlan(final Entity shooter,
             final IHonorUtil honorUtil,
             final Game game,
-            final Map<Mounted, Double> ammoConservation) {
+            final Map<WeaponMounted, Double> ammoConservation) {
         FiringPlan bestPlan = new FiringPlan();
 
         // optimal firing patterns for units such as dropships, Thunderbolts with multi-trac
@@ -54,9 +57,9 @@ public class MultiTargetFireControl extends FireControl {
         // So, the basic algorithm is as follows:
         // For each weapon, calculate the easiest shot.
         // Then, solve the backpack problem.
-
-        List<Mounted> weaponList;
-
+        
+        List<WeaponMounted> weaponList;
+        
         if (shooter.usesWeaponBays()) {
             weaponList = shooter.getWeaponBayList();
         } else {
@@ -107,32 +110,42 @@ public class MultiTargetFireControl extends FireControl {
      * @param weapon Weapon to fire.
      * @return The weapon fire info with the most expected damage. Null if no such thing.
      */
-    WeaponFireInfo getBestShot(Entity shooter, Mounted weapon) {
+    WeaponFireInfo getBestShot(Entity shooter, WeaponMounted weapon) {
         WeaponFireInfo bestShot = null;
 
         for (Targetable target : getTargetableEnemyEntities(shooter, owner.getGame(), owner.getFireControlState())) {
+            WeaponFireInfo betterShot = null;
             final int ownerID = (target instanceof Entity) ? ((Entity) target).getOwnerId() : -1;
             if (owner.getHonorUtil().isEnemyBroken(target.getId(), ownerID, owner.getBehaviorSettings().isForcedWithdrawal())) {
                 LogManager.getLogger().info(target.getDisplayName() + " is broken - ignoring");
                 continue;
             }
 
-            ArrayList<Mounted> ammos;
-            if (weapon.getBayWeapons().isEmpty()) {
-                ammos = shooter.getAmmo(weapon);
+            if (effectivelyAmmoless(weapon.getType())) {
+                betterShot = buildWeaponFireInfo(shooter, target, weapon, null, owner.getGame(), false);
             } else {
-                ammos = new ArrayList<>();
-                ammos.add(null);
-            }
-
-            for (Mounted ammo: ammos) {
-                WeaponFireInfo shot = buildWeaponFireInfo(shooter, target, weapon, ammo, owner.getGame(), false);
-
-                // this is a better shot if it has a chance of doing damage and the damage is better than the previous best shot
-                if ((shot.getExpectedDamage() > 0) &&
-                        ((bestShot == null) || (shot.getExpectedDamage() > bestShot.getExpectedDamage()))) {
-                    bestShot = shot;
+                List<AmmoMounted> ammos;
+                if (weapon.getBayWeapons().isEmpty()) {
+                    ammos = shooter.getAmmo(weapon);
+                } else {
+                    ammos = new ArrayList<>();
+                    ammos.add(null);
                 }
+
+                for (AmmoMounted ammo : ammos) {
+                    WeaponFireInfo shot = buildWeaponFireInfo(shooter, target, weapon, ammo, owner.getGame(), false);
+
+                    // this is a better shot if it has a chance of doing damage and the damage is better than the previous best shot
+                    if ((shot.getExpectedDamage() > 0) &&
+                            ((betterShot == null) || (shot.getExpectedDamage() > betterShot.getExpectedDamage()))) {
+                        betterShot = shot;
+                    }
+                }
+            }
+            // Now do the same comparison for the better shot of all these shots to determine the *best* shot
+            if ((betterShot != null && betterShot.getExpectedDamage() > 0) &&
+                    ((bestShot == null) || (betterShot.getExpectedDamage() > bestShot.getExpectedDamage()))) {
+                bestShot = betterShot;
             }
         }
 
@@ -176,11 +189,11 @@ public class MultiTargetFireControl extends FireControl {
         firingPlan.setUtility(utility);
     }
 
-    FiringPlan calculateFiringPlan(Entity shooter, List<Mounted> weaponList) {
+    protected FiringPlan calculateFiringPlan(Entity shooter, List<WeaponMounted> weaponList) {
         FiringPlan retVal = new FiringPlan();
 
         List<WeaponFireInfo> shotList = new ArrayList<>();
-        for (Mounted weapon : weaponList) {
+        for (WeaponMounted weapon : weaponList) {
             WeaponFireInfo shot = getBestShot(shooter, weapon);
             if (shot != null) {
                 shotList.add(shot);
@@ -199,7 +212,7 @@ public class MultiTargetFireControl extends FireControl {
             retVal = calculateIndividualWeaponFiringPlan(shooter, shotList, shooterIsLarge);
         }
 
-        calculateUtility(retVal, calcHeatTolerance(shooter, shooter.isAero()), true);
+        calculateUtility(retVal, calcHeatTolerance(shooter, shooter.isAero()), shooter.isAero());
         return retVal;
     }
 

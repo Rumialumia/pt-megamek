@@ -22,6 +22,8 @@ import megamek.common.MovePath.MoveStepType;
 import megamek.common.enums.MPBoosters;
 import megamek.common.options.OptionsConstants;
 import megamek.common.pathfinder.CachedEntityState;
+import megamek.common.planetaryconditions.Atmosphere;
+import megamek.common.planetaryconditions.PlanetaryConditions;
 import org.apache.logging.log4j.LogManager;
 
 import java.io.Serializable;
@@ -2876,7 +2878,8 @@ public class MoveStep implements Serializable {
         }
 
         // only walking speed in Tornados
-        if (game.getPlanetaryConditions().getWindStrength() == PlanetaryConditions.WI_TORNADO_F4) {
+        PlanetaryConditions conditions = game.getPlanetaryConditions();
+        if (conditions.getWind().isTornadoF4()) {
             if (getMpUsed() > tmpWalkMP) {
                 movementType = EntityMovementType.MOVE_ILLEGAL;
                 return;
@@ -2963,9 +2966,9 @@ public class MoveStep implements Serializable {
         final boolean isLightSpecialist = en.getCrew().getOptions().stringOption(OptionsConstants.MISC_ENV_SPECIALIST).equals(Crew.ENVSPC_LIGHT);
         int nSrcEl = srcHex.getLevel() + prevEl;
         int nDestEl = destHex.getLevel() + elevation;
+        PlanetaryConditions conditions = game.getPlanetaryConditions();
 
         mp = 1;
-
 
         // 0 MP infantry units can move 1 hex
         if (isInfantry
@@ -2979,7 +2982,6 @@ public class MoveStep implements Serializable {
             return;
         }
 
-
         boolean applyNightPen =
                 !game.getOptions().booleanOption(OptionsConstants.ADVGRNDMOV_NO_NIGHT_MOVE_PEN);
         boolean carefulExempt =
@@ -2989,30 +2991,36 @@ public class MoveStep implements Serializable {
         if (!game.getBoard().inSpace() && isCareful() && applyNightPen
                 && !carefulExempt) {
             // Fog
-            switch (game.getPlanetaryConditions().getFog()) {
-                case PlanetaryConditions.FOG_LIGHT:
+            switch (conditions.getFog()) {
+                case FOG_LIGHT:
                     if (!isFogSpecialist) {
                         mp += 1;
                     }
                     break;
-                case PlanetaryConditions.FOG_HEAVY:
+                case FOG_HEAVY:
                     if (!isFogSpecialist) {
                         mp += 2;
                     } else {
                         mp += 1;
                     }
                     break;
+                default:
             }
 
-            // Light
+            // Light TO:AR 6th ed. p. 34
             if (!entity.isNightwalker()) {
-                switch (game.getPlanetaryConditions().getLight()) {
-                    case PlanetaryConditions.L_FULL_MOON:
+                switch (conditions.getLight()) {
+                    case FULL_MOON:
                         if (!isLightSpecialist && !en.isUsingSearchlight()) {
                             mp += 1;
                         }
                         break;
-                    case PlanetaryConditions.L_MOONLESS:
+                    case GLARE:
+                        if (!isLightSpecialist) {
+                            mp += 1;
+                        }
+                        break;
+                    case MOONLESS:
                         if (en.isUsingSearchlight()) {
                             break;
                         }
@@ -3023,19 +3031,26 @@ public class MoveStep implements Serializable {
                             mp += 1;
                         }
                         break;
-                    case PlanetaryConditions.L_PITCH_BLACK:
+                    case SOLAR_FLARE:
+                        if (!isLightSpecialist) {
+                            mp += 2;
+                        } else {
+                            mp += 1;
+                        }
+                        break;
+                    case PITCH_BLACK:
                         if (!isLightSpecialist) {
                             mp += 3;
                         } else {
                             mp += 1;
                         }
                         break;
+                    default:
                 }
-            } else if (game.getPlanetaryConditions().getLight() > PlanetaryConditions.L_DUSK) {
+            } else if (conditions.getLight().isFullMoonOrGlareOrMoonlessOrSolarFlareOrPitchBack()) {
                 setRunProhibited(true);
             }
         }
-
 
         // VTOLs pay 1 for everything
         if (moveMode == EntityMovementMode.VTOL) {
@@ -3049,8 +3064,8 @@ public class MoveStep implements Serializable {
 
         // Be careful on pavement during cold weather, there may be black ice.
         boolean useBlackIce = game.getOptions().booleanOption(OptionsConstants.ADVANCED_BLACK_ICE);
-        boolean goodTemp = game.getPlanetaryConditions().getTemperature() <= PlanetaryConditions.BLACK_ICE_TEMP;
-        boolean goodWeather = game.getPlanetaryConditions().getWeather() == PlanetaryConditions.WE_ICE_STORM;
+        boolean goodTemp = conditions.getTemperature() <= PlanetaryConditions.BLACK_ICE_TEMP;
+        boolean goodWeather = conditions.getWeather().isIceStorm();
 
         if (isPavementStep && ((useBlackIce && goodTemp) || goodWeather)) {
             if (destHex.containsTerrain(Terrains.BLACK_ICE)){
@@ -3979,6 +3994,9 @@ public class MoveStep implements Serializable {
 
     public boolean dueFreeTurn() {
         Entity en = getEntity();
+        if (en.isSpaceborne()) {
+            return false;
+        }
         int straight = getNStraight();
         int vel = getVelocity();
         int thresh = 99;
@@ -4099,7 +4117,9 @@ public class MoveStep implements Serializable {
             return false;
         }
         // are we airborne in non-vacuum?
-        return en.isAirborne() && !game.getPlanetaryConditions().isVacuum();
+        PlanetaryConditions conditions = game.getPlanetaryConditions();
+        return en.isAirborne()
+                && !conditions.getAtmosphere().isLighterThan(Atmosphere.THIN);
     }
 
     /**

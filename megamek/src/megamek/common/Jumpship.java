@@ -13,7 +13,9 @@ package megamek.common;
 
 import megamek.client.ui.swing.calculationReport.CalculationReport;
 import megamek.common.cost.JumpShipCostCalculator;
+import megamek.common.equipment.AmmoMounted;
 import megamek.common.equipment.ArmorType;
+import megamek.common.equipment.WeaponMounted;
 import megamek.common.options.OptionsConstants;
 
 import java.util.ArrayList;
@@ -672,23 +674,23 @@ public class Jumpship extends Aero {
     }
     
     //Methods for dealing with the K-F Drive, Sail and L-F Battery
-    
+
     public void setKFIntegrity(int kf) {
         kf_integrity = kf;
     }
-    
+
     public int getKFIntegrity() {
         return kf_integrity;
     }
-    
+
     public void setOKFIntegrity(int kf) {
         original_kf_integrity = kf;
     }
-    
+
     public int getOKFIntegrity() {
         return original_kf_integrity;
     }
-    
+
     public int getKFDriveDamage() {
         return (getOKFIntegrity() - getKFIntegrity());
     }
@@ -702,7 +704,7 @@ public class Jumpship extends Aero {
                 || getKFChargingSystemHit()
                 || getKFFieldInitiatorHit());
     }
-    
+
     public void setKFHeliumTankIntegrity(int ht) {
         helium_tankage = ht;
     }
@@ -711,63 +713,63 @@ public class Jumpship extends Aero {
     public int getKFHeliumTankIntegrity() {
         return helium_tankage;
     }
-    
+
     public void setKFHeliumTankHit(boolean hit) {
         heliumTankHit = hit;
     }
-    
+
     public boolean getKFHeliumTankHit() {
         return heliumTankHit;
     }
-    
+
     public void setKFDriveCoilHit(boolean hit) {
         driveCoilHit = hit;
     }
-    
+
     public boolean getKFDriveCoilHit() {
         return driveCoilHit;
     }
-    
+
     public void setKFFieldInitiatorHit(boolean hit) {
         fieldInitiatorHit = hit;
     }
-    
+
     public boolean getKFFieldInitiatorHit() {
         return fieldInitiatorHit;
     }
-    
+
     public void setKFChargingSystemHit(boolean hit) {
         chargingSystemHit = hit;
     }
-    
+
     public boolean getKFChargingSystemHit() {
         return chargingSystemHit;
     }
-    
+
     public void setKFDriveControllerHit(boolean hit) {
         driveControllerHit = hit;
     }
-    
+
     public boolean getKFDriveControllerHit() {
         return driveControllerHit;
     }
-    
+
     public boolean getLFBatteryHit() {
         return lfBatteryHit;
     }
-    
+
     public void setLFBatteryHit(boolean hit) {
         lfBatteryHit = hit;
     }
-    
+
     public void setOSailIntegrity(int sail) {
         original_sail_integrity = sail;
     }
-    
+
     public int getOSailIntegrity() {
         return original_sail_integrity;
     }
-    
+
     public int getSailDamage() {
         return (getOSailIntegrity() - getSailIntegrity());
     }
@@ -775,7 +777,7 @@ public class Jumpship extends Aero {
     public void setSailIntegrity(int sail) {
         sail_integrity = sail;
     }
-    
+
     public int getSailIntegrity() {
         return sail_integrity;
     }
@@ -1150,17 +1152,17 @@ public class Jumpship extends Aero {
      * need to check bay location before loading ammo
      */
     @Override
-    public boolean loadWeapon(Mounted mounted, Mounted mountedAmmo) {
+    public boolean loadWeapon(WeaponMounted mounted, AmmoMounted mountedAmmo) {
         boolean success = false;
-        WeaponType wtype = (WeaponType) mounted.getType();
-        AmmoType atype = (AmmoType) mountedAmmo.getType();
+        WeaponType wtype = mounted.getType();
+        AmmoType atype = mountedAmmo.getType();
 
         if (mounted.getLocation() != mountedAmmo.getLocation()) {
             return success;
         }
 
         // for large craft, ammo must be in the same ba
-        Mounted bay = whichBay(getEquipmentNum(mounted));
+        WeaponMounted bay = whichBay(getEquipmentNum(mounted));
         if ((bay != null) && !bay.ammoInBay(getEquipmentNum(mountedAmmo))) {
             return success;
         }
@@ -1398,5 +1400,15 @@ public class Jumpship extends Aero {
     @Override
     public boolean isCapitalScale() {
         return true;
+    }
+
+    @Override
+    public boolean isJumpShip() {
+        return true;
+    }
+
+    @Override
+    public int getGenericBattleValue() {
+        return (int) Math.round(Math.exp(0.0619 + 0.5607*Math.log(getWeight())));
     }
 }

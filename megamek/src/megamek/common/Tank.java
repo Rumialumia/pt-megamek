@@ -18,7 +18,9 @@ import megamek.common.cost.CombatVehicleCostCalculator;
 import megamek.common.enums.AimingMode;
 import megamek.common.enums.GamePhase;
 import megamek.common.enums.MPBoosters;
+import megamek.common.equipment.AmmoMounted;
 import megamek.common.options.OptionsConstants;
+import megamek.common.planetaryconditions.PlanetaryConditions;
 import megamek.common.weapons.flamers.VehicleFlamerWeapon;
 import megamek.common.weapons.lasers.CLChemicalLaserWeapon;
 import org.apache.logging.log4j.LogManager;
@@ -109,6 +111,8 @@ public class Tank extends Entity {
                 ToHitData.SIDE_LEFT, LOC_LEFT,
                 ToHitData.SIDE_RIGHT, LOC_RIGHT,
                 ToHitData.SIDE_REAR, LOC_REAR);
+    protected boolean hasSponsons = false;
+    protected boolean hasPintle = false;
 
     @Override
     public int getUnitType() {
@@ -273,6 +277,9 @@ public class Tank extends Entity {
         if (!hasNoDualTurret()) {
             ctl.addComponent(getDualTurretTA());
         }
+        if (hasSponsons) {
+            ctl.addComponent(EquipmentType.get(EquipmentTypeLookup.SPONSON_TURRET).getTechAdvancement());
+        }
     }
 
     @Override
@@ -291,26 +298,23 @@ public class Tank extends Entity {
         }
 
         if (!mpCalculationSetting.ignoreWeather && (null != game)) {
-            int weatherMod = game.getPlanetaryConditions().getMovementMods(this);
+            PlanetaryConditions conditions = game.getPlanetaryConditions();
+            int weatherMod = conditions.getMovementMods(this);
             mp = Math.max(mp + weatherMod, 0);
 
             if (getCrew().getOptions().stringOption(OptionsConstants.MISC_ENV_SPECIALIST).equals(Crew.ENVSPC_SNOW)) {
-                if ((game.getPlanetaryConditions().getWeather() == PlanetaryConditions.WE_ICE_STORM)) {
+                if (conditions.getWeather().isIceStorm()) {
                     mp += 2;
                 }
 
-                if ((game.getPlanetaryConditions().getWeather() == PlanetaryConditions.WE_SLEET)
-                        || (game.getPlanetaryConditions().getWeather() == PlanetaryConditions.WE_LIGHT_SNOW)
-                        || (game.getPlanetaryConditions().getWeather() == PlanetaryConditions.WE_MOD_SNOW)
-                        || (game.getPlanetaryConditions().getWeather() == PlanetaryConditions.WE_HEAVY_SNOW)
-                        || (game.getPlanetaryConditions().getWeather() == PlanetaryConditions.WE_SNOW_FLURRIES)) {
+                if (conditions.getWeather().isLightSnowOrModerateSnowOrSnowFlurriesOrHeavySnowOrSleet()) {
                     mp += 1;
                 }
             }
 
             if(getCrew().getOptions().stringOption(OptionsConstants.MISC_ENV_SPECIALIST).equals(Crew.ENVSPC_WIND)
-                    && (game.getPlanetaryConditions().getWeather() == PlanetaryConditions.WE_NONE)
-                    && (game.getPlanetaryConditions().getWindStrength() == PlanetaryConditions.WI_TORNADO_F13)) {
+                    && conditions.getWeather().isClear()
+                    && conditions.getWind().isTornadoF1ToF3()) {
                 mp += 1;
             }
         }
@@ -1835,6 +1839,9 @@ public class Tank extends Entity {
                 && mounted.getType().hasFlag(MiscType.F_JUMP_JET)) {
             setOriginalJumpMP(getOriginalJumpMP() + 1);
         }
+        // Track unusual turrets for tech calculations
+        hasSponsons |= mounted.isSponsonTurretMounted();
+        hasPintle |= mounted.isPintleTurretMounted();
     }
 
     /**
@@ -2414,12 +2421,12 @@ public class Tank extends Entity {
         // for ammo, each type of ammo takes one slots, regardless of
         // submunition type
         Set<String> foundAmmo = new HashSet<>();
-        for (Mounted ammo : getAmmo()) {
+        for (AmmoMounted ammo : getAmmo()) {
             // don't count oneshot ammo
-            if (ammo.isOneShotAmmo()) {
+            if (ammo.isOneShot()) {
                 continue;
             }
-            AmmoType at = (AmmoType) ammo.getType();
+            AmmoType at = ammo.getType();
             if (!foundAmmo.contains(at.getAmmoType() + ":" + at.getRackSize())) {
                 usedSlots++;
                 foundAmmo.add(at.getAmmoType() + ":" + at.getRackSize());
@@ -3045,5 +3052,10 @@ public class Tank extends Entity {
     @Override
     public boolean getsAutoExternalSearchlight() {
         return true;
+    }
+
+    @Override
+    public int getGenericBattleValue() {
+        return (int) Math.round(Math.exp(2.866 + 0.987*Math.log(getWeight())));
     }
 }

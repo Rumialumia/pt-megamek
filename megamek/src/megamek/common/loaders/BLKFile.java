@@ -20,7 +20,9 @@ import java.util.stream.Collectors;
 import com.sun.mail.util.DecodingException;
 import megamek.common.*;
 import megamek.common.InfantryBay.PlatoonType;
+import megamek.common.equipment.AmmoMounted;
 import megamek.common.equipment.ArmorType;
+import megamek.common.equipment.WeaponMounted;
 import megamek.common.options.IBasicOption;
 import megamek.common.options.IOption;
 import megamek.common.options.PilotOptions;
@@ -101,6 +103,14 @@ public class BLKFile {
 
         if (dataFile.exists("source")) {
             entity.setSource(dataFile.getDataAsString("source")[0]);
+        }
+
+        if (dataFile.exists("fluffimage")) {
+            entity.getFluff().setFluffImage(dataFile.getDataAsString("fluffimage")[0]);
+        }
+
+        if (dataFile.exists("icon")) {
+            entity.setIcon(dataFile.getDataAsString("icon")[0]);
         }
 
         setTechLevel(entity);
@@ -455,11 +465,6 @@ public class BLKFile {
                     e.getFluff().setSystemModel(comp, fields[1]);
                 }
             }
-        }
-
-        if (dataFile.exists("imagepath")) {
-            e.getFluff().setMMLImagePath(
-                    dataFile.getDataAsString("imagepath")[0]);
         }
 
         if (dataFile.exists("notes")) {
@@ -863,7 +868,7 @@ public class BLKFile {
         for (int i = 0; i < numLocs; i++) {
             eq.add(new Vector<>());
         }
-        for (Mounted m : t.getEquipment()) {
+        for (Mounted<?> m : t.getEquipment()) {
             // Ignore Mounteds that represent a WeaponGroup
             // BA anti-personnel weapons are written just after the mount
             if (m.isWeaponGroup() || m.isAPMMounted() || (m.getType() instanceof InfantryAttack)) {
@@ -886,9 +891,9 @@ public class BLKFile {
                     continue;
                 }
                 boolean rear = m.isRearMounted();
-                for (int i = 0; i < m.getBayWeapons().size(); i++) {
-                    Mounted w = t.getEquipment(m.getBayWeapons().get(i));
-                    String name = w.getType().getInternalName();
+                List<WeaponMounted> bayWeapons = ((WeaponMounted) m).getBayWeapons();
+                for (int i = 0; i < bayWeapons.size(); i++) {
+                    String name = bayWeapons.get(i).getType().getInternalName();
                     if (i == 0) {
                         name = "(B) " + name;
                     }
@@ -897,8 +902,7 @@ public class BLKFile {
                     }
                     eq.get(loc).add(name);
                 }
-                for (Integer aNum : m.getBayAmmo()) {
-                    Mounted a = t.getEquipment(aNum);
+                for (AmmoMounted a : ((WeaponMounted) m).getBayAmmo()) {
                     String name = a.getType().getInternalName();
                     name += ":" + a.getBaseShotsLeft();
                     if (rear) {
@@ -972,10 +976,6 @@ public class BLKFile {
         list = t.getFluff().createSystemModelsList();
         if (!list.isEmpty()) {
             blk.writeBlockData("systemModels", list);
-        }
-
-        if (!t.getFluff().getMMLImagePath().isBlank()) {
-            blk.writeBlockData("imagepath", t.getFluff().getMMLImagePath());
         }
 
         if (!t.getFluff().getNotes().isBlank()) {
@@ -1169,6 +1169,14 @@ public class BLKFile {
             blk.writeBlockData("battlearmor", js.getNBattleArmor());
             blk.writeBlockData("life_boat", js.getLifeBoats());
             blk.writeBlockData("escape_pod", js.getEscapePods());
+        }
+
+        if (t.hasEmbeddedIcon()) {
+            blk.writeBlockData("icon", t.getBase64Icon().getBase64String());
+        }
+
+        if (t.getFluff().hasEmbeddedFluffImage()) {
+            blk.writeBlockData("fluffimage", t.getFluff().getBase64FluffImage().getBase64String());
         }
         return blk;
     }

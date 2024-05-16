@@ -53,15 +53,28 @@ public class AeroSpaceFighter extends Aero {
         return false;
     }
 
+    @Override
+    public boolean isBomber() {
+        return true;
+    }
+
+    @Override
+    public boolean isFighter() {
+        return true;
+    }
+
+    @Override
+    public boolean isAerospaceFighter() {
+        return true;
+    }
+
     /**
-     * Damage a capital fighter's weapons. WeaponGroups are damaged by critical hits.
-     * This matches up the individual fighter's weapons and critical slots and damages those
-     * for MHQ resolution
-     * @param loc - Int corresponding to the location struck
+     * Method to enable mass location damaging, mainly for Fighter Squadrons
+     * @param loc that every fighter in the squadron needs to damage, for MekHQ tracking
      */
-    public void damageCapFighterWeapons(int loc) {
-        for (Mounted weapon : weaponList) {
-            if (weapon.getLocation() == loc) {
+    public void damageLocation(int loc) {
+        weaponList.stream().filter(x -> x.getLocation() == loc).forEach(
+            (weapon)-> {
                 //Damage the weapon
                 weapon.setHit(true);
                 //Damage the critical slot
@@ -78,26 +91,16 @@ public class AeroSpaceFighter extends Aero {
                     }
                 }
             }
-        }
-    }
-
-    @Override
-    public boolean isBomber() {
-        return true;
-    }
-
-    @Override
-    public boolean isFighter() {
-        return true;
-    }
-
-    @Override
-    public boolean isAerospaceFighter() {
-        return true;
+        );
     }
 
     @Override
     public long getEntityType() {
         return super.getEntityType() | Entity.ETYPE_AEROSPACEFIGHTER;
+    }
+
+    @Override
+    public int getGenericBattleValue() {
+        return (int) Math.round(Math.exp(3.729 + 0.898*Math.log(getWeight())));
     }
 }
