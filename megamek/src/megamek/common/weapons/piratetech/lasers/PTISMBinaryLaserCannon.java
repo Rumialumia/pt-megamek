@@ -11,44 +11,44 @@
  * or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * for more details.
  */
-package megamek.common.weapons.lasers;
+package megamek.common.weapons.piratetech.lasers;
 
 import megamek.common.SimpleTechLevel;
+import megamek.common.weapons.lasers.LaserWeapon;
 
 /**
- * @author Jason Tighe
- * @since Sep 12, 2004
+ * @author Meows
+ * @since Feb 26, 2024
  */
-public class ISBinaryLaserCannon extends LaserWeapon {
+public class PTISMBinaryLaserCannon extends LaserWeapon {
     private static final long serialVersionUID = -6849916948609019186L;
 
-    public ISBinaryLaserCannon() {
+    public PTISMBinaryLaserCannon() {
         super();
-        name = "Large Binary Laser (Blazer) Cannon";
+        name = "Medium Binary Laser (Blazer) Cannon";
         setInternalName(name);
-        addLookupName("IS Binary Laser Cannon");
-        addLookupName("ISBlazer");
-        addLookupName("ISBinaryLaserCannon");
-        addLookupName("ISBinaryLaser");
-        addLookupName("Blazer Cannon");
-        heat = 16;
-        damage = 12;
-        shortRange = 5;
-        mediumRange = 10;
-        longRange = 15;
-        extremeRange = 20;
-        waterShortRange = 3;
-        waterMediumRange = 6;
-        waterLongRange = 9;
-        waterExtremeRange = 12;
-        tonnage = 9.0;
-        criticals = 4;
-        bv = 222;
-        cost = 200000;
+        addLookupName("IS Medium Binary Laser Cannon");
+        addLookupName("ISMBlazer");
+        addLookupName("ISMBinaryLaserCannon");
+        addLookupName("ISMBinaryLaser");
+        addLookupName("Medium Blazer Cannon");
+        heat = 5;
+        damage = 8;
+        shortRange = 3;
+        mediumRange = 6;
+        longRange = 9;
+        extremeRange = 12;
+        waterShortRange = 2;
+        waterMediumRange = 4;
+        waterLongRange = 6;
+        waterExtremeRange = 8;
+        tonnage = 1.5;
+        criticals = 2;
+        bv = 82;
+        cost = 80000;
         shortAV = 12;
         medAV = 12;
-        maxRange = RANGE_MED;
-        flags = flags.andNot(F_PROTO_WEAPON);
+        maxRange = RANGE_SHORT;
         // Tech Progression tweaked to combine IntOps with TRO Prototypes/3145 NTNU RS
         rulesRefs = "319, TO";
         techAdvancement.setTechBase(TECH_BASE_IS)

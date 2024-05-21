@@ -1143,7 +1143,7 @@ public class TestMech extends TestEntity {
                 illegal = true;
             }
             if (mech.getWeight() > 55) {
-                buff.append("LAMs cannot be larger than 55 tons.\n");
+                buff.append("LAMs can not be larger than 55 tons.\n");
                 illegal = true;
             }
             EquipmentType structure = EquipmentType.get(EquipmentType.getStructureTypeName(mech.getStructureType(),
@@ -1396,6 +1396,8 @@ public class TestMech extends TestEntity {
 
         for (WeaponMounted m : mech.getWeaponList()) {
             if ((m.getType().getAmmoType() == AmmoType.T_GAUSS_HEAVY)
+                    || (m.getType().getAmmoType() == AmmoType.T_SBHGAUSS)
+                    || (m.getType().getAmmoType() == AmmoType.T_BALLISTA_HEAVY)
                     || (m.getType().getAmmoType() == AmmoType.T_IGAUSS_HEAVY)) {
                 boolean torso = mech.locationIsTorso(m.getLocation());
                 if (m.getSecondLocation() != Entity.LOC_NONE) {
